@@ -72,7 +72,7 @@ const ProfileForm = () => {
       if (profilePic) {
         const storageRef = ref(
           storage,
-          `profilePictures/${auth.currentUser.uid}`
+          `profilePictures/${auth.currentUser.uid}`,
         );
         const snapshot = await uploadBytes(storageRef, profilePic);
         uploadedProfilePicURL = await getDownloadURL(snapshot.ref);

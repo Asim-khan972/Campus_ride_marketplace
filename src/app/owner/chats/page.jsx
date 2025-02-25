@@ -25,7 +25,7 @@ export default function OwnerChatInbox() {
     const chatsRef = collection(db, "chats");
     const q = query(
       chatsRef,
-      where("participants", "array-contains", user.uid)
+      where("participants", "array-contains", user.uid),
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedChats = snapshot.docs.map((doc) => ({
@@ -127,7 +127,7 @@ export default function OwnerChatInbox() {
                           <span>
                             {chat.updatedAt
                               ? new Date(
-                                  chat.updatedAt.seconds * 1000
+                                  chat.updatedAt.seconds * 1000,
                                 ).toLocaleDateString()
                               : "No messages yet"}
                           </span>

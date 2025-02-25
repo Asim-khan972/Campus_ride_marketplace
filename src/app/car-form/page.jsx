@@ -53,7 +53,7 @@ const CarForm = () => {
         if (file) {
           const storageRef = ref(
             storage,
-            `cars/${user.uid}/${Date.now()}_${i}_${file.name}`
+            `cars/${user.uid}/${Date.now()}_${i}_${file.name}`,
           );
           const snapshot = await uploadBytes(storageRef, file);
           const url = await getDownloadURL(snapshot.ref);

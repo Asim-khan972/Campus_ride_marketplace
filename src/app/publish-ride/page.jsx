@@ -67,7 +67,7 @@ const PublishRide = () => {
       (error) => {
         console.error("Error fetching cars:", error);
         setLoadingCars(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -102,7 +102,7 @@ const PublishRide = () => {
 
     if (seats > Number(selectedCar.maxCapacity)) {
       setMessage(
-        `Available seats cannot exceed car capacity of ${selectedCar.maxCapacity}.`
+        `Available seats cannot exceed car capacity of ${selectedCar.maxCapacity}.`,
       );
       return;
     }

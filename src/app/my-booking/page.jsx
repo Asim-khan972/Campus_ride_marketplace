@@ -87,7 +87,7 @@ export default function MyBookingsPage() {
             const bookingData = { id: docSnap.id, ...docSnap.data() };
             try {
               const rideDoc = await getDoc(
-                doc(db, "rides", bookingData.rideId)
+                doc(db, "rides", bookingData.rideId),
               );
               if (rideDoc.exists()) {
                 return { ...bookingData, ride: rideDoc.data() };
@@ -98,11 +98,11 @@ export default function MyBookingsPage() {
               console.error(
                 "Error fetching ride for booking",
                 bookingData.id,
-                err
+                err,
               );
               return { ...bookingData, ride: null };
             }
-          })
+          }),
         );
         setBookings(fetchedBookings);
         setLoading(false);
@@ -111,7 +111,7 @@ export default function MyBookingsPage() {
         console.error("Error fetching bookings:", err);
         setError("Failed to load bookings. Please try again.");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -166,12 +166,12 @@ export default function MyBookingsPage() {
     (booking) =>
       booking.ride &&
       ["not_started", "waiting_for_customer", "started"].includes(
-        booking.ride.status
-      )
+        booking.ride.status,
+      ),
   );
   const previousBookings = bookings.filter(
     (booking) =>
-      booking.ride && ["finished", "cancelled"].includes(booking.ride.status)
+      booking.ride && ["finished", "cancelled"].includes(booking.ride.status),
   );
 
   const BookingCard = ({ booking, type }) => (
@@ -193,7 +193,7 @@ export default function MyBookingsPage() {
             <Calendar className="h-4 w-4 mr-1 text-black" />
             {booking.bookingTime
               ? new Date(
-                  booking.bookingTime.seconds * 1000
+                  booking.bookingTime.seconds * 1000,
                 ).toLocaleDateString()
               : "N/A"}
           </div>

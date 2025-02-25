@@ -53,7 +53,7 @@ const Signup = () => {
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
     if (!passwordRegex.test(password)) {
       setError(
-        "Password must be at least 8 characters long and contain both letters and numbers"
+        "Password must be at least 8 characters long and contain both letters and numbers",
       );
       setIsLoading(false);
       return;
@@ -63,7 +63,7 @@ const Signup = () => {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
       const userObj = userCredential.user;
 

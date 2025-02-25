@@ -66,7 +66,7 @@ export default function DriverDashboard() {
         console.error("Error fetching rides:", err);
         setError("Failed to load rides. Please try again.");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -76,10 +76,10 @@ export default function DriverDashboard() {
   const previousStatuses = ["finished", "cancelled"];
 
   const currentRides = rides.filter((ride) =>
-    currentStatuses.includes(ride.status)
+    currentStatuses.includes(ride.status),
   );
   const previousRides = rides.filter((ride) =>
-    previousStatuses.includes(ride.status)
+    previousStatuses.includes(ride.status),
   );
 
   if (!user) {

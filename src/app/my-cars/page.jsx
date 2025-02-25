@@ -35,7 +35,7 @@ const MyCars = () => {
       (error) => {
         console.error("Error fetching cars:", error);
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();

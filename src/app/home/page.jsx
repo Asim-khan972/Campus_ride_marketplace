@@ -54,7 +54,7 @@ export default function Home() {
       const q = query(
         ridesRef,
         where("pickupLocation", "==", searchForm.from),
-        where("destinationLocation", "==", searchForm.to)
+        where("destinationLocation", "==", searchForm.to),
       );
 
       const querySnapshot = await getDocs(q);
@@ -77,12 +77,12 @@ export default function Home() {
 
     if (maxPrice) {
       tempRides = tempRides.filter(
-        (ride) => Number(ride.pricePerSeat) <= Number(maxPrice)
+        (ride) => Number(ride.pricePerSeat) <= Number(maxPrice),
       );
     }
     if (minSeats) {
       tempRides = tempRides.filter(
-        (ride) => Number(ride.availableSeats) >= Number(minSeats)
+        (ride) => Number(ride.availableSeats) >= Number(minSeats),
       );
     }
     if (filterAirCond) {
@@ -194,7 +194,7 @@ export default function Home() {
                             >
                               {date}
                             </button>
-                          )
+                          ),
                         )}
                       </div>
                     )}

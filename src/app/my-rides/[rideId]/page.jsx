@@ -82,7 +82,7 @@ export default function RideDetailsPage() {
         console.error("Error fetching ride:", err);
         setError("Failed to load ride details.");
         setLoading(false);
-      }
+      },
     );
     return () => unsubscribe();
   }, [rideId]);
