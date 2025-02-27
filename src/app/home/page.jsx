@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import {
   Calendar,
-  User2,
   MapPin,
   Zap,
   Shield,
@@ -26,7 +25,7 @@ export default function Home() {
   const [searchForm, setSearchForm] = useState({
     from: "",
     to: "",
-    date: "Today",
+    date: "",
     passengers: 1,
   });
   const [isDateOpen, setIsDateOpen] = useState(false);
@@ -37,6 +36,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsTO, setSuggestionsTO] = useState([]);
+  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
+  const [showToSuggestions, setShowToSuggestions] = useState(false);
 
   // Filter state
   const [maxPrice, setMaxPrice] = useState("");
@@ -44,8 +47,45 @@ export default function Home() {
   const [filterAirCond, setFilterAirCond] = useState(false);
   const [filterWifi, setFilterWifi] = useState(false);
 
+  // Refs for outside click detection
+  const fromSuggestionsRef = useRef(null);
+  const toSuggestionsRef = useRef(null);
+
+  useEffect(() => {
+    // Set today's date as default
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+    setSearchForm((prev) => ({ ...prev, date: formattedDate }));
+
+    // Handle clicks outside suggestion boxes
+    function handleClickOutside(event) {
+      if (
+        fromSuggestionsRef.current &&
+        !fromSuggestionsRef.current.contains(event.target)
+      ) {
+        setShowFromSuggestions(false);
+      }
+      if (
+        toSuggestionsRef.current &&
+        !toSuggestionsRef.current.contains(event.target)
+      ) {
+        setShowToSuggestions(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const handleSearch = async (e) => {
     e.preventDefault();
+    if (searchForm.from === searchForm.to) {
+      setError("Pickup and destination locations cannot be the same.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -121,6 +161,38 @@ export default function Home() {
     });
   };
 
+  const fetchSuggestions = async (input) => {
+    if (!input) return setSuggestions([]);
+    try {
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`,
+      );
+      const data = await response.json();
+      setSuggestions(
+        data.features.map((feature) => feature.properties.formatted),
+      );
+      setShowFromSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching autocomplete suggestions:", error);
+    }
+  };
+
+  const fetchSuggestionsTO = async (input) => {
+    if (!input) return setSuggestionsTO([]);
+    try {
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`,
+      );
+      const data = await response.json();
+      setSuggestionsTO(
+        data.features.map((feature) => feature.properties.formatted),
+      );
+      setShowToSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching autocomplete suggestions:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -136,7 +208,7 @@ export default function Home() {
               <div className="bg-white rounded-lg p-4 shadow-lg">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* From Input */}
-                  <div className="relative">
+                  <div className="relative" ref={fromSuggestionsRef}>
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <MapPin className="h-5 w-5" />
                     </div>
@@ -144,15 +216,36 @@ export default function Home() {
                       type="text"
                       placeholder="Leaving from..."
                       value={searchForm.from}
-                      onChange={(e) =>
-                        setSearchForm({ ...searchForm, from: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setSearchForm({ ...searchForm, from: e.target.value });
+                        fetchSuggestions(e.target.value);
+                      }}
                       className="w-full pl-10 pr-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8163e9] focus:border-transparent text-gray-900"
                     />
+                    {showFromSuggestions && suggestions.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {suggestions.map((suggestion, index) => (
+                          <li
+                            key={index}
+                            onClick={() => {
+                              setSearchForm({
+                                ...searchForm,
+                                from: suggestion,
+                              });
+                              setShowFromSuggestions(false);
+                              setSuggestions([]);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
+                          >
+                            {suggestion}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   {/* To Input */}
-                  <div className="relative">
+                  <div className="relative" ref={toSuggestionsRef}>
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <MapPin className="h-5 w-5" />
                     </div>
@@ -160,75 +253,66 @@ export default function Home() {
                       type="text"
                       placeholder="Going to..."
                       value={searchForm.to}
-                      onChange={(e) =>
-                        setSearchForm({ ...searchForm, to: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setSearchForm({ ...searchForm, to: e.target.value });
+                        fetchSuggestionsTO(e.target.value);
+                      }}
                       className="w-full pl-10 pr-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#8163e9] focus:border-transparent text-gray-900"
                     />
-                  </div>
-
-                  {/* Date Selector */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsDateOpen(!isDateOpen)}
-                      className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md text-gray-900 hover:border-[#8163e9] transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                        <span>{searchForm.date}</span>
-                      </div>
-                    </button>
-                    {isDateOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-md shadow-lg border p-2 z-10">
-                        {["Today", "Tomorrow", "In 2 days", "In 3 days"].map(
-                          (date) => (
-                            <button
-                              key={date}
-                              type="button"
-                              onClick={() => {
-                                setSearchForm({ ...searchForm, date });
-                                setIsDateOpen(false);
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md text-gray-900"
-                            >
-                              {date}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Passengers Selector */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsPassengersOpen(!isPassengersOpen)}
-                      className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md text-gray-900 hover:border-[#8163e9] transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <User2 className="h-5 w-5 text-gray-400" />
-                        <span>
-                          {searchForm.passengers} passenger
-                          {searchForm.passengers !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </button>
-                    {isPassengersOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-md shadow-lg border p-2 z-10">
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                          <button
-                            key={num}
-                            type="button"
-                            onClick={() => handlePassengerChange(num)}
-                            className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded-md text-gray-900"
+                    {showToSuggestions && suggestionsTO.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {suggestionsTO.map((suggestion, index) => (
+                          <li
+                            key={index}
+                            onClick={() => {
+                              setSearchForm({ ...searchForm, to: suggestion });
+                              setShowToSuggestions(false);
+                              setSuggestionsTO([]);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
                           >
-                            {num} passenger{num !== 1 ? "s" : ""}
-                          </button>
+                            {suggestion}
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     )}
+                  </div>
+
+                  {/* Passengers Input */}
+                  <div className="relative">
+                    <div className="flex items-center gap-2 border border-gray-300 rounded-md px-3 py-2">
+                      <Users className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      <input
+                        type="number"
+                        min="1"
+                        max="8"
+                        value={searchForm.passengers}
+                        onChange={(e) =>
+                          setSearchForm({
+                            ...searchForm,
+                            passengers:
+                              Number.parseInt(e.target.value, 10) || 1,
+                          })
+                        }
+                        className="w-full focus:outline-none text-gray-900 bg-transparent"
+                        placeholder="Passengers"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Date Input */}
+                  <div className="relative">
+                    <div className="flex items-center gap-2 border border-gray-300 rounded-md px-3 py-2">
+                      <Calendar className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                      <input
+                        type="date"
+                        value={searchForm.date}
+                        onChange={(e) =>
+                          setSearchForm({ ...searchForm, date: e.target.value })
+                        }
+                        className="w-full focus:outline-none text-gray-900 bg-transparent"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -236,7 +320,7 @@ export default function Home() {
                 <div className="mt-4 md:mt-6 flex justify-end">
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !searchForm.from || !searchForm.to}
                     className="w-full md:w-auto px-8 py-3 bg-[#8163e9] text-white rounded-md hover:bg-[#8163e9]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
@@ -256,20 +340,22 @@ export default function Home() {
             </form>
 
             {/* Search Results */}
-            {error ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600 mb-6 animate-fadeIn">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5" />
-                  {error}
+                  <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                  <span>{error}</span>
                 </div>
               </div>
-            ) : rides.length > 0 ? (
-              <div className="relative">
+            )}
+
+            {rides.length > 0 && (
+              <div className="relative animate-fadeIn">
                 {/* Mobile Filter Toggle */}
                 <div className="md:hidden mb-4">
                   <button
                     onClick={() => setIsFilterOpen(!isFilterOpen)}
-                    className="w-full bg-white text-[#8163e9] border border-[#8163e9] rounded-lg px-4 py-2 flex items-center justify-center gap-2"
+                    className="w-full bg-white text-[#8163e9] border border-[#8163e9] rounded-lg px-4 py-2 flex items-center justify-center gap-2 transition-colors hover:bg-[#8163e9]/5"
                   >
                     <Search className="h-5 w-5" />
                     {isFilterOpen ? "Hide Filters" : "Show Filters"}
@@ -294,7 +380,7 @@ export default function Home() {
                       </h2>
                       <button
                         onClick={() => setIsFilterOpen(false)}
-                        className="p-2 hover:bg-gray-100 rounded-full"
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                       >
                         <X className="h-5 w-5" />
                       </button>
@@ -411,7 +497,7 @@ export default function Home() {
                               href={`/home/rides/${ride.id}`}
                               className="block"
                             >
-                              <div className="border rounded-lg p-4 hover:border-[#8163e9] transition-colors">
+                              <div className="border rounded-lg p-4 hover:border-[#8163e9] hover:shadow-md transition-all duration-200">
                                 <div className="flex items-start justify-between mb-3">
                                   <div className="space-y-1">
                                     <div className="flex items-center gap-2">
@@ -437,8 +523,8 @@ export default function Home() {
                                   </div>
                                 </div>
 
-                                <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between text-sm gap-2">
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                                     <div className="flex items-center gap-1">
                                       <Calendar className="h-4 w-4 text-gray-400" />
                                       <span className="text-gray-600">
@@ -454,10 +540,20 @@ export default function Home() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {ride.airConditioning && (
-                                      <Wind className="h-4 w-4 text-[#8163e9]" />
+                                      <div className="flex items-center gap-1 bg-[#8163e9]/10 px-2 py-1 rounded-full">
+                                        <Wind className="h-3 w-3 text-[#8163e9]" />
+                                        <span className="text-xs text-[#8163e9]">
+                                          AC
+                                        </span>
+                                      </div>
                                     )}
                                     {ride.wifiAvailable && (
-                                      <Wifi className="h-4 w-4 text-[#8163e9]" />
+                                      <div className="flex items-center gap-1 bg-[#8163e9]/10 px-2 py-1 rounded-full">
+                                        <Wifi className="h-3 w-3 text-[#8163e9]" />
+                                        <span className="text-xs text-[#8163e9]">
+                                          WiFi
+                                        </span>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -481,7 +577,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
 

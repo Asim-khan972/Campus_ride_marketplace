@@ -16,6 +16,7 @@ import {
   Car,
   ChevronRight,
   AlertCircle,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -69,7 +70,7 @@ const MyProfile = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#8163e9]" />
       </div>
     );
@@ -99,7 +100,7 @@ const MyProfile = () => {
       title: "My Bookings",
       description: "View and manage your trip bookings",
       icon: BookOpen,
-      href: "/my-booking",
+      href: "/bookings",
       color: "bg-blue-100",
       iconColor: "text-blue-600",
     },
@@ -107,9 +108,17 @@ const MyProfile = () => {
       title: "My Rides",
       description: "Manage your rides and schedules",
       icon: Car,
-      href: "/my-rides",
+      href: "/driver/dashboard",
       color: "bg-green-100",
       iconColor: "text-green-600",
+    },
+    {
+      title: "My Cars",
+      description: "Manage your vehicles and preferences",
+      icon: Settings,
+      href: "/my-cars",
+      color: "bg-purple-100",
+      iconColor: "text-purple-600",
     },
   ];
 
@@ -184,14 +193,14 @@ const MyProfile = () => {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {quickLinks.map((link) => (
             <Link
               key={link.title}
               href={link.href}
-              className="block group hover:shadow-md transition-shadow duration-200"
+              className="block group hover:shadow-md transition-all duration-200"
             >
-              <div className="bg-white rounded-xl p-6 flex items-start gap-4">
+              <div className="bg-white rounded-xl p-6 flex items-start gap-4 h-full border border-transparent hover:border-[#8163e9]/20">
                 <div className={`${link.color} p-3 rounded-lg`}>
                   <link.icon className={`w-6 h-6 ${link.iconColor}`} />
                 </div>

@@ -88,6 +88,7 @@ const Signup = () => {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+      router.push("/profileform");
     } catch (err) {
       setError(err.message.replace("Firebase: ", ""));
     }

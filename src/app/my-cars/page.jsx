@@ -43,7 +43,7 @@ const MyCars = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center">
+      <div className="min-h-[100vh] flex  bg-gray-100 items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#8163e9]" />
       </div>
     );

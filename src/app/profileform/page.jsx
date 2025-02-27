@@ -7,9 +7,12 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import universityList from "@/data/universities.json";
 import { useRouter } from "next/navigation";
 import { Loader2, UserCircle } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { onAuthStateChanged } from "firebase/auth";
 
 const ProfileForm = () => {
   const router = useRouter();
+  const { user } = useAuth();
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [university, setUniversity] = useState("");
@@ -20,33 +23,39 @@ const ProfileForm = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isNewProfile, setIsNewProfile] = useState(true);
 
+  console.log("here i am auth user", auth.currentUser);
+  console.log(" hey this is my current user ", user);
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!auth.currentUser) {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        console.log("Firebase user loaded:", firebaseUser);
+        fetchUserProfile(firebaseUser.uid);
+      } else {
+        setIsLoading(false);
         router.push("/login");
-        return;
       }
+    });
 
-      try {
-        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setFullName(data.fullName || "");
-          setBio(data.bio || "");
-          setUniversity(data.university || "");
-          setProfilePicURL(data.profilePicURL || "");
-          setIsNewProfile(false);
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        setMessage("Error loading profile data.");
-      }
-      setIsLoading(false);
-    };
-
-    fetchUserProfile();
+    return () => unsubscribe();
   }, [router]);
 
+  const fetchUserProfile = async (uid) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setFullName(data.fullName || "");
+        setBio(data.bio || "");
+        setUniversity(data.university || "");
+        setProfilePicURL(data.profilePicURL || "");
+        setIsNewProfile(false);
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      setMessage("Error loading profile data.");
+    }
+    setIsLoading(false);
+  };
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
       setProfilePic(e.target.files[0]);
@@ -101,7 +110,7 @@ const ProfileForm = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#8163e9]" />
       </div>
     );
