@@ -26,7 +26,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          {!authLoading && user ? (
+          {/* {!authLoading && user ? (
             <nav className="hidden md:flex items-end gap-8">
               <Link
                 href="/about"
@@ -35,12 +35,20 @@ export default function Navbar() {
                 About
               </Link>
             </nav>
-          ) : null}
+          ) : null} */}
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
             {!authLoading && user ? (
               <>
+                <nav className="hidden md:flex items-end gap-8">
+                  <Link
+                    href="/about"
+                    className="text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    About
+                  </Link>
+                </nav>
                 <button className="p-2 hover:bg-gray-100 rounded-md transition-colors">
                   <Search className="h-5 w-5 text-black" />
                 </button>

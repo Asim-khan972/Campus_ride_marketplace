@@ -141,10 +141,10 @@ const MyProfile = () => {
       iconColor: "text-purple-600",
     },
     {
-      title: "Settings",
-      description: "Update your preferences",
+      title: "About",
+      description: "Details About us",
       icon: Settings,
-      href: "/settings",
+      href: "/about",
       color: "bg-gray-100",
       iconColor: "text-gray-600",
     },
