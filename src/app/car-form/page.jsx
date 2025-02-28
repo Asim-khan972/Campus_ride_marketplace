@@ -53,7 +53,7 @@ const CarForm = () => {
         if (file) {
           const storageRef = ref(
             storage,
-            `cars/${user.uid}/${Date.now()}_${i}_${file.name}`,
+            `cars/${user.uid}/${Date.now()}_${i}_${file.name}`
           );
           const snapshot = await uploadBytes(storageRef, file);
           const url = await getDownloadURL(snapshot.ref);
@@ -142,14 +142,14 @@ const CarForm = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Car Number
+                    License Plate Number
                   </label>
                   <input
                     type="text"
                     value={carNumber}
                     onChange={(e) => setCarNumber(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
-                    placeholder="Enter car number"
+                    placeholder="Enter License Plate Number"
                     required
                   />
                 </div>

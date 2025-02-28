@@ -81,7 +81,7 @@ const ProfileForm = () => {
       if (profilePic) {
         const storageRef = ref(
           storage,
-          `profilePictures/${auth.currentUser.uid}`,
+          `profilePictures/${auth.currentUser.uid}`
         );
         const snapshot = await uploadBytes(storageRef, profilePic);
         uploadedProfilePicURL = await getDownloadURL(snapshot.ref);
@@ -189,6 +189,7 @@ const ProfileForm = () => {
                   </label>
                   <select
                     value={university}
+                    disabled={!isNewProfile && university !== ""}
                     onChange={(e) => setUniversity(e.target.value)}
                     required
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"

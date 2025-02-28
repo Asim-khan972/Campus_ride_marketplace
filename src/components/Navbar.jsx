@@ -21,36 +21,18 @@ export default function Navbar() {
               href={user ? "/home" : "/"}
               className="text-2xl font-bold text-[#8163e9]"
             >
-              My-Campus
+              Campus Rides
             </Link>
           </div>
 
           {/* Desktop Navigation */}
           {!authLoading && user ? (
-            <nav className="hidden md:flex items-center gap-8">
+            <nav className="hidden md:flex items-end gap-8">
               <Link
-                href="#"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Carpool
-              </Link>
-              <Link
-                href="#"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Bus
-              </Link>
-              <Link
-                href="#"
+                href="/about"
                 className="text-gray-600 hover:text-gray-900 transition-colors"
               >
                 About
-              </Link>
-              <Link
-                href="#"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Help
               </Link>
             </nav>
           ) : null}
@@ -60,7 +42,7 @@ export default function Navbar() {
             {!authLoading && user ? (
               <>
                 <button className="p-2 hover:bg-gray-100 rounded-md transition-colors">
-                  <Search className="h-5 w-5" />
+                  <Search className="h-5 w-5 text-black" />
                 </button>
                 <Link href="/publish-ride">
                   <button className="flex items-center gap-2 bg-[#8163e9] text-white px-4 py-2 rounded-md hover:bg-[#8163e9]/90 transition-colors">
@@ -70,7 +52,7 @@ export default function Navbar() {
                 </Link>
                 <Link href="/my-profile">
                   <button className="p-2 hover:bg-gray-100 rounded-md transition-colors">
-                    <User2 className="h-5 w-5" />
+                    <User2 className="h-5 w-5 text-black" />
                   </button>
                 </Link>
               </>
@@ -102,9 +84,9 @@ export default function Navbar() {
               className="p-2 hover:bg-gray-100 rounded-md"
             >
               {isMenuOpen ? (
-                <X className="h-6 w-6" />
+                <X className="h-6 w-6 text-black" />
               ) : (
-                <Menu className="h-6 w-6" />
+                <Menu className="h-6 w-6 text-black" />
               )}
             </button>
           </div>
@@ -117,28 +99,10 @@ export default function Navbar() {
               {!authLoading && user ? (
                 <>
                   <Link
-                    href="#"
-                    className="text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    Carpool
-                  </Link>
-                  <Link
-                    href="#"
-                    className="text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    Bus
-                  </Link>
-                  <Link
-                    href="#"
+                    href="/about"
                     className="text-gray-600 hover:text-gray-900 transition-colors"
                   >
                     About
-                  </Link>
-                  <Link
-                    href="#"
-                    className="text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    Help
                   </Link>
                   <Link href="/publish-ride">
                     <button className="flex items-center gap-2 bg-[#8163e9] text-white px-4 py-2 rounded-md hover:bg-[#8163e9]/90 transition-colors w-full justify-center">
@@ -148,7 +112,7 @@ export default function Navbar() {
                   </Link>
                   <Link href="/my-profile">
                     <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
-                      <User2 className="h-4 w-4" />
+                      <User2 className="h-4 w-4 text-black" />
                       My Profile
                     </button>
                   </Link>

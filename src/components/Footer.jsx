@@ -2,13 +2,18 @@ import Link from "next/link";
 import { Facebook, Twitter, Instagram, Youtube } from "lucide-react";
 
 export default function Footer() {
+  const handleNewsletterSubmit = (e) => {
+    e.preventDefault();
+    // Handle newsletter subscription
+  };
+
   return (
     <footer className="bg-gray-50 border-t">
       <div className="container mx-auto px-4 py-8 md:py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">About</h3>
+            <h3 className="text-lg font-semibold text-black">About</h3>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -45,48 +50,9 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Community */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Community</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="#"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Stories
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="#"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Travel blog
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="#"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Partners
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="#"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Ambassador program
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Support */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Support</h3>
+            <h3 className="text-lg font-semibold text-black">Support</h3>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -124,63 +90,44 @@ export default function Footer() {
           </div>
 
           {/* Social Links */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Follow us</h3>
-            <div className="flex space-x-4">
+          <div className="space-y-4 sm:col-span-2 lg:col-span-1">
+            <h3 className="text-lg font-semibold text-black">Follow us</h3>
+            <div className="flex flex-wrap gap-4">
               <Link
                 href="#"
-                className="text-gray-600 hover:text-[#00AFF5] transition-colors"
+                className="text-gray-600 hover:text-[#8163e9] transition-colors"
               >
-                <Facebook className="h-6 w-6" />
+                <Facebook className="h-6 w-6 text-[#8163e9]" />
               </Link>
               <Link
                 href="#"
-                className="text-gray-600 hover:text-[#00AFF5] transition-colors"
+                className="text-gray-600 hover:text-[#8163e9] transition-colors"
               >
-                <Twitter className="h-6 w-6" />
+                <Twitter className="h-6 w-6 text-[#8163e9]" />
+              </Link>
+              <Link
+                href="https://www.instagram.com/campusapp.us/"
+                className="text-gray-600 hover:text-[#8163e9] transition-colors"
+              >
+                <Instagram className="h-6 w-6 text-[#8163e9]" />
               </Link>
               <Link
                 href="#"
-                className="text-gray-600 hover:text-[#00AFF5] transition-colors"
+                className="text-gray-600 hover:text-[#8163e9] transition-colors"
               >
-                <Instagram className="h-6 w-6" />
+                <Youtube className="h-6 w-6 text-[#8163e9]" />
               </Link>
-              <Link
-                href="#"
-                className="text-gray-600 hover:text-[#00AFF5] transition-colors"
-              >
-                <Youtube className="h-6 w-6" />
-              </Link>
-            </div>
-            <div className="pt-4">
-              <p className="text-sm text-gray-600">Download our mobile app</p>
-              <div className="flex gap-2 mt-2">
-                <Link href="#" className="block">
-                  <img
-                    src="/placeholder.svg?height=40&width=120"
-                    alt="Download on the App Store"
-                    className="h-10"
-                  />
-                </Link>
-                <Link href="#" className="block">
-                  <img
-                    src="/placeholder.svg?height=40&width=120"
-                    alt="Get it on Google Play"
-                    className="h-10"
-                  />
-                </Link>
-              </div>
             </div>
           </div>
         </div>
 
         {/* Bottom Section */}
         <div className="mt-8 pt-8 border-t">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-600">
-              © {new Date().getFullYear()} BlaBlaCar. All rights reserved.
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-gray-600 text-center sm:text-left">
+              © {new Date().getFullYear()} 2025 Campus App. All rights reserved.
             </p>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="#"
                 className="text-sm text-gray-600 hover:text-gray-900 transition-colors"

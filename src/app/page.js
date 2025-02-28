@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <div className="relative h-[85vh] bg-gradient-to-b from-[#8163e9] to-[#6f54c9] overflow-hidden">
         {/* Background Pattern */}
@@ -45,34 +45,6 @@ export default function Home() {
 
         {/* Hero Image */}
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-white to-transparent" />
-      </div>
-
-      {/* Stats Section */}
-      <div className="bg-white py-16">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold text-[#8163e9] mb-2">65M+</div>
-              <div className="text-gray-600">Members</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-[#8163e9] mb-2">25+</div>
-              <div className="text-gray-600">Countries</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-[#8163e9] mb-2">
-                100M+
-              </div>
-              <div className="text-gray-600">Rides Shared</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-[#8163e9] mb-2">
-                5.0⭐
-              </div>
-              <div className="text-gray-600">Average Rating</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Trust Banner */}

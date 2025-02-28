@@ -35,7 +35,7 @@ const MyCars = () => {
       (error) => {
         console.error("Error fetching cars:", error);
         setLoading(false);
-      },
+      }
     );
 
     return () => unsubscribe();
@@ -145,7 +145,7 @@ const MyCars = () => {
 
                   <div className="flex items-center text-gray-700">
                     <Hash className="w-5 h-5 mr-2 text-[#8163e9]" />
-                    <span className="font-medium">Car Number:</span>
+                    <span className="font-medium">License Plate Number:</span>
                     <span className="ml-2">{car.carNumber}</span>
                   </div>
 

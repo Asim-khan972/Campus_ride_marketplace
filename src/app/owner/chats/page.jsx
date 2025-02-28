@@ -1,18 +1,24 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import {
   MessageSquare,
   Loader2,
   AlertCircle,
-  Users,
   ChevronRight,
-  Clock,
+  UserCircle,
 } from "lucide-react";
+import Image from "next/image";
 
 export default function OwnerChatInbox() {
   const { user } = useAuth();
@@ -25,15 +31,54 @@ export default function OwnerChatInbox() {
     const chatsRef = collection(db, "chats");
     const q = query(
       chatsRef,
-      where("participants", "array-contains", user.uid),
+      where("participants", "array-contains", user.uid)
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedChats = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setChats(fetchedChats);
-      setLoading(false);
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      try {
+        // Fetch all chats
+        const fetchedChats = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        // Fetch user details for all participants
+        const chatsWithUsers = await Promise.all(
+          fetchedChats.map(async (chat) => {
+            const userDetails = await Promise.all(
+              chat.participants.map(async (participantId) => {
+                const userDoc = await getDoc(doc(db, "users", participantId));
+                if (userDoc.exists()) {
+                  return {
+                    id: userDoc.id,
+                    ...userDoc.data(),
+                  };
+                }
+                return {
+                  id: participantId,
+                  fullName: "Unknown User",
+                };
+              })
+            );
+
+            // Find the other user in the chat (not the current user)
+            const otherUser =
+              userDetails.find((u) => u.id !== user.uid) || null;
+
+            return {
+              ...chat,
+              userDetails,
+              otherUser,
+            };
+          })
+        );
+
+        setChats(chatsWithUsers);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching user details:", error);
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -103,15 +148,31 @@ export default function OwnerChatInbox() {
             {chats.map((chat) => (
               <Link key={chat.id} href={`/chat/${chat.id}`} className="block">
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    {/* User Avatar */}
+                    <div className="flex-shrink-0">
+                      {chat.otherUser?.profilePicURL ? (
+                        <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                          <Image
+                            src={chat.otherUser.profilePicURL}
+                            alt={chat.otherUser.fullName}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                          <UserCircle className="w-8 h-8 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Chat Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <Users className="h-5 w-5 text-[#8163e9]" />
+                      <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center space-x-2">
                           <span className="font-medium text-black truncate">
-                            {chat.participants
-                              .filter((id) => id !== user.uid)
-                              .join(", ")}
+                            {chat.otherUser?.fullName || "Unknown User"}
                           </span>
                           {chat.unreadCount > 0 && (
                             <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-[#8163e9] rounded-full">
@@ -119,27 +180,22 @@ export default function OwnerChatInbox() {
                             </span>
                           )}
                         </div>
+                        <span className="text-sm text-gray-500">
+                          {chat.updatedAt
+                            ? new Date(
+                                chat.updatedAt.seconds * 1000
+                              ).toLocaleDateString()
+                            : "No messages yet"}
+                        </span>
                       </div>
 
-                      <div className="flex items-center text-sm text-gray-500 space-x-4">
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            {chat.updatedAt
-                              ? new Date(
-                                  chat.updatedAt.seconds * 1000,
-                                ).toLocaleDateString()
-                              : "No messages yet"}
-                          </span>
-                        </div>
-                        {chat.lastMessage && (
-                          <p className="truncate text-black">
-                            {chat.lastMessage}
-                          </p>
-                        )}
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600 truncate">
+                          {chat.lastMessage || "No messages yet"}
+                        </p>
+                        <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0 ml-4" />
                   </div>
                 </div>
               </Link>
