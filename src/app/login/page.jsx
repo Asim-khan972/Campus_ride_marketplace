@@ -27,17 +27,32 @@ const Signin = () => {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
+  const validateEmail = (email) => {
+    // Check if email ends with .edu
+    if (!email.toLowerCase().endsWith(".edu")) {
+      return "Only .edu email addresses are allowed";
+    }
+    return null;
+  };
   const handleSignin = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
     setLoading(true);
 
+    // Validate email domain
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setError(emailError);
+      setLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
-        password,
+        password
       );
       const user = userCredential.user;
 

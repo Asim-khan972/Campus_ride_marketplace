@@ -203,6 +203,12 @@ const MyProfile = () => {
                     <School className="w-4 h-4 mr-2" />
                     <span>{profile.university}</span>
                   </div>
+                  {profile.location && (
+                    <div className="flex items-center justify-center text-gray-600">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span>{profile.location}</span>
+                    </div>
+                  )}
                   {profile.updatedAt && (
                     <div className="flex items-center justify-center text-sm text-gray-500">
                       <Calendar className="w-4 h-4 mr-2" />

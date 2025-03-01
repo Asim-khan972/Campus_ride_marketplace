@@ -6,7 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import universityList from "@/data/universities.json";
 import { useRouter } from "next/navigation";
-import { Loader2, UserCircle } from "lucide-react";
+import { Loader2, UserCircle, MapPin } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -16,6 +16,9 @@ const ProfileForm = () => {
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [university, setUniversity] = useState("");
+  const [location, setLocation] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [profilePic, setProfilePic] = useState(null);
   const [profilePicURL, setProfilePicURL] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,8 +26,6 @@ const ProfileForm = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isNewProfile, setIsNewProfile] = useState(true);
 
-  console.log("here i am auth user", auth.currentUser);
-  console.log(" hey this is my current user ", user);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -47,6 +48,7 @@ const ProfileForm = () => {
         setFullName(data.fullName || "");
         setBio(data.bio || "");
         setUniversity(data.university || "");
+        setLocation(data.location || "");
         setProfilePicURL(data.profilePicURL || "");
         setIsNewProfile(false);
       }
@@ -56,6 +58,44 @@ const ProfileForm = () => {
     }
     setIsLoading(false);
   };
+
+  // Function to fetch location suggestions using Geoapify
+  const fetchLocationSuggestions = async (input) => {
+    if (!input) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(
+          input
+        )}&apiKey=a2564e175403446795b3090484ca787e`
+      );
+      const data = await response.json();
+      setLocationSuggestions(
+        data.features.map((feature) => feature.properties.formatted)
+      );
+      setShowLocationSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching location suggestions:", error);
+    }
+  };
+
+  // Set up click outside listener for location suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest(".location-suggestions")) {
+        setShowLocationSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
       setProfilePic(e.target.files[0]);
@@ -91,6 +131,7 @@ const ProfileForm = () => {
         fullName,
         bio,
         university,
+        location,
         profilePicURL: uploadedProfilePicURL,
         updatedAt: new Date(),
       };
@@ -201,6 +242,44 @@ const ProfileForm = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Location with Autocomplete */}
+                <div className="col-span-2 relative location-suggestions">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Location
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => {
+                        setLocation(e.target.value);
+                        fetchLocationSuggestions(e.target.value);
+                      }}
+                      className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                      placeholder="Enter your location"
+                      required
+                    />
+                  </div>
+                  {showLocationSuggestions &&
+                    locationSuggestions.length > 0 && (
+                      <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 shadow-lg max-h-60 overflow-auto">
+                        {locationSuggestions.map((suggestion, index) => (
+                          <li
+                            key={index}
+                            onClick={() => {
+                              setLocation(suggestion);
+                              setShowLocationSuggestions(false);
+                            }}
+                            className="p-3 hover:bg-gray-100 cursor-pointer text-sm text-gray-800 border-b border-gray-100 last:border-b-0"
+                          >
+                            {suggestion}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                 </div>
 
                 {/* Bio */}

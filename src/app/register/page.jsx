@@ -1,9 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
-import { Loader2, Mail, Lock, Timer } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -11,6 +8,8 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
+import { Loader2, Mail, Lock, Timer } from "lucide-react";
+import Link from "next/link";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
@@ -37,24 +36,48 @@ const Signup = () => {
     return () => clearInterval(interval);
   }, [timer, isRegistered]);
 
+  const validateEmail = (email) => {
+    // Check if email ends with .edu
+    if (!email.toLowerCase().endsWith(".edu")) {
+      return "Only .edu email addresses are allowed";
+    }
+    return null;
+  };
+
+  const validatePassword = (password) => {
+    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number, and 1 special character
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character";
+    }
+    return null;
+  };
+
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
     setIsLoading(true);
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match!");
+    // Validate email domain
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setError(emailError);
       setIsLoading(false);
       return;
     }
 
-    // Password validation
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      setError(
-        "Password must be at least 8 characters long and contain both letters and numbers",
-      );
+    // Validate password
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      setIsLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match!");
       setIsLoading(false);
       return;
     }
@@ -63,7 +86,7 @@ const Signup = () => {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password,
+        password
       );
       const userObj = userCredential.user;
 

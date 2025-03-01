@@ -15,9 +15,18 @@ import {
   X,
   Filter,
 } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import {
+  collection,
+  query,
+  getDocs,
+  orderBy,
+  getDoc,
+  doc,
+} from "firebase/firestore";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 // Helper function to extract city from address
 const extractCity = (address) => {
@@ -47,6 +56,7 @@ const deg2rad = (deg) => {
 };
 
 export default function Home() {
+  const router = useRouter();
   const [searchForm, setSearchForm] = useState({
     from: "",
     to: "",
@@ -60,38 +70,88 @@ export default function Home() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyRides, setNearbyRides] = useState([]);
-
+  const [profile, setProfile] = useState(null);
   // Filter states
   const [maxPrice, setMaxPrice] = useState("");
   const [minSeats, setMinSeats] = useState("");
   const [filterAirCond, setFilterAirCond] = useState(false);
   const [filterWifi, setFilterWifi] = useState(false);
   const [sortBy, setSortBy] = useState("distance"); // distance, price, date
+  const { user, loading: authLoading } = useAuth();
+
+  const fetchProfile = async () => {
+    if (authLoading) return;
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.log("No authenticated user found. Exiting...");
+        return;
+      }
+
+      console.log("Fetching profile for:", currentUser.uid);
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      console.log("user doc", userDoc);
+      if (userDoc.exists()) {
+        const userProfile = { id: userDoc.id, ...userDoc.data() };
+        console.log("user profile ", userProfile);
+        setProfile(userProfile);
+
+        if (userProfile.location) {
+          fetchRidesForLocation(userProfile.location);
+        } else {
+          console.log("User has no saved location.");
+        }
+      } else {
+        console.log("No profile found, redirecting to profile creation.");
+        router.push("/profileform");
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      setError("Error loading profile data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Set today's date as default
-    const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
-    setSearchForm((prev) => ({ ...prev, date: formattedDate }));
+    fetchProfile();
+  }, [authLoading, router]);
 
-    // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.error("Error getting location:", error);
+  const fetchRidesForLocation = async (location) => {
+    console.log("location ", location);
+    alert("location ", location);
+    setLoading(true);
+    try {
+      const ridesRef = collection(db, "rides");
+      const q = query(ridesRef, orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      const fetchedRides = [];
+      const cityName = extractCity(location).toLowerCase();
+
+      querySnapshot.forEach((doc) => {
+        const ride = { id: doc.id, ...doc.data() };
+        // Only include rides not created by the current user
+        if (ride.ownerId !== user?.uid) {
+          const rideFromCity = extractCity(ride.pickupLocation).toLowerCase();
+          if (
+            rideFromCity.includes(cityName) ||
+            cityName.includes(rideFromCity)
+          ) {
+            fetchedRides.push(ride);
+          }
         }
-      );
-    }
+      });
 
-    // Fetch initial nearby rides
-    fetchNearbyRides();
-  }, []);
+      setRides(fetchedRides);
+      setFilteredRides(fetchedRides);
+    } catch (err) {
+      console.error("Error fetching rides:", err);
+      setError("Failed to fetch rides. Please try again.");
+    }
+    setLoading(false);
+  };
 
   const fetchNearbyRides = async () => {
     setLoading(true);
@@ -102,19 +162,21 @@ export default function Home() {
 
       const fetchedRides = [];
       querySnapshot.forEach((doc) => {
-        fetchedRides.push({ id: doc.id, ...doc.data() });
+        const ride = { id: doc.id, ...doc.data() };
+        // Only include rides not created by the current user
+        if (ride.ownerId !== user?.uid) {
+          fetchedRides.push(ride);
+        }
       });
 
       setRides(fetchedRides);
       setFilteredRides(fetchedRides);
-      setNearbyRides(fetchedRides);
     } catch (err) {
       console.error("Error fetching rides:", err);
       setError("Failed to fetch rides. Please try again.");
     }
     setLoading(false);
   };
-
   const handleSearch = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -330,17 +392,23 @@ export default function Home() {
               <div className="space-y-6">
                 {/* Sort Options */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-black mb-2">
                     Sort by
                   </label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
+                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] text-black focus:border-transparent"
                   >
-                    <option value="distance">Distance</option>
-                    <option value="price">Price</option>
-                    <option value="date">Date</option>
+                    <option value="distance" className="text-black">
+                      Distance
+                    </option>
+                    <option value="price" className="text-black">
+                      Price
+                    </option>
+                    <option value="date" className="text-black">
+                      Date
+                    </option>
                   </select>
                 </div>
 
