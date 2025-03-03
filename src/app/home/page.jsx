@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Calendar,
   MapPin,
@@ -28,17 +28,13 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
-// Helper function to extract city from address
 const extractCity = (address) => {
-  // Split address by commas and get the city part
   const parts = address.split(",").map((part) => part.trim());
-  // Usually city is the second-to-last part, or last if no state/country
   return parts[parts.length > 2 ? parts.length - 2 : parts.length - 1];
 };
 
-// Helper function to calculate distance between two points
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371; // Radius of the earth in km
+  const R = 6371;
   const dLat = deg2rad(lat2 - lat1);
   const dLon = deg2rad(lon2 - lon1);
   const a =
@@ -48,7 +44,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance in km
+  return R * c;
 };
 
 const deg2rad = (deg) => {
@@ -76,8 +72,15 @@ export default function Home() {
   const [minSeats, setMinSeats] = useState("");
   const [filterAirCond, setFilterAirCond] = useState(false);
   const [filterWifi, setFilterWifi] = useState(false);
-  const [sortBy, setSortBy] = useState("distance"); // distance, price, date
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsTO, setSuggestionsTO] = useState([]);
+  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
+  const [showToSuggestions, setShowToSuggestions] = useState(false);
+  const [sortBy, setSortBy] = useState("distance");
   const { user, loading: authLoading } = useAuth();
+
+  const fromSuggestionsRef = useRef(null);
+  const toSuggestionsRef = useRef(null);
 
   const fetchProfile = async () => {
     if (authLoading) return;
@@ -89,12 +92,11 @@ export default function Home() {
         return;
       }
 
-      console.log("Fetching profile for:", currentUser.uid);
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      console.log("user doc", userDoc);
+
       if (userDoc.exists()) {
         const userProfile = { id: userDoc.id, ...userDoc.data() };
-        console.log("user profile ", userProfile);
+
         setProfile(userProfile);
 
         if (userProfile.location) {
@@ -120,7 +122,6 @@ export default function Home() {
 
   const fetchRidesForLocation = async (location) => {
     console.log("location ", location);
-    alert("location ", location);
     setLoading(true);
     try {
       const ridesRef = collection(db, "rides");
@@ -179,6 +180,11 @@ export default function Home() {
   };
   const handleSearch = async (e) => {
     e.preventDefault();
+    if (searchForm.from === searchForm.to) {
+      setError("Pickup and destination locations cannot be the same.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -302,6 +308,39 @@ export default function Home() {
     });
   };
 
+  const fetchSuggestions = async (input) => {
+    if (!input) return setSuggestions([]);
+    try {
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
+      );
+      const data = await response.json();
+      console.log("data ", data);
+      setSuggestions(
+        data.features.map((feature) => feature.properties.formatted)
+      );
+      setShowFromSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching autocomplete suggestions:", error);
+    }
+  };
+
+  const fetchSuggestionsTO = async (input) => {
+    if (!input) return setSuggestionsTO([]);
+    try {
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
+      );
+      const data = await response.json();
+      setSuggestionsTO(
+        data.features.map((feature) => feature.properties.formatted)
+      );
+      setShowToSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching autocomplete suggestions:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Search Section */}
@@ -310,7 +349,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto">
             <form onSubmit={handleSearch} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
+                <div className="relative" ref={fromSuggestionsRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                     <MapPin className="h-5 w-5" />
                   </div>
@@ -318,13 +357,35 @@ export default function Home() {
                     type="text"
                     placeholder="Leaving from..."
                     value={searchForm.from}
-                    onChange={(e) =>
-                      setSearchForm({ ...searchForm, from: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setSearchForm({ ...searchForm, from: e.target.value });
+                      fetchSuggestions(e.target.value);
+                    }}
                     className="w-full pl-10 pr-3 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
+
+                  {showFromSuggestions && suggestions.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {suggestions.map((suggestion, index) => (
+                        <li
+                          key={index}
+                          onClick={() => {
+                            setSearchForm({
+                              ...searchForm,
+                              from: suggestion,
+                            });
+                            setShowFromSuggestions(false);
+                            setSuggestions([]);
+                          }}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
+                        >
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div className="relative">
+                <div className="relative" ref={toSuggestionsRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                     <MapPin className="h-5 w-5" />
                   </div>
@@ -332,11 +393,29 @@ export default function Home() {
                     type="text"
                     placeholder="Going to..."
                     value={searchForm.to}
-                    onChange={(e) =>
-                      setSearchForm({ ...searchForm, to: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setSearchForm({ ...searchForm, to: e.target.value });
+                      fetchSuggestionsTO(e.target.value);
+                    }}
                     className="w-full pl-10 pr-3 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
+                  {showToSuggestions && suggestionsTO.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {suggestionsTO.map((suggestion, index) => (
+                        <li
+                          key={index}
+                          onClick={() => {
+                            setSearchForm({ ...searchForm, to: suggestion });
+                            setShowToSuggestions(false);
+                            setSuggestionsTO([]);
+                          }}
+                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
+                        >
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
               <div className="flex gap-4">

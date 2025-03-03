@@ -41,12 +41,12 @@ const Signin = () => {
     setLoading(true);
 
     // Validate email domain
-    const emailError = validateEmail(email);
-    if (emailError) {
-      setError(emailError);
-      setLoading(false);
-      return;
-    }
+    // const emailError = validateEmail(email);
+    // if (emailError) {
+    //   setError(emailError);
+    //   setLoading(false);
+    //   return;
+    // }
 
     try {
       const userCredential = await signInWithEmailAndPassword(
