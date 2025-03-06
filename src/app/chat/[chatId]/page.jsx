@@ -297,7 +297,7 @@ export default function ChatPage() {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#8163e9] focus:border-transparent text-gray-900 bg-gray-50"
+            className="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none   focus:ring-[#8163e9] focus:border-transparent text-gray-900 bg-gray-50"
             required
           />
           <button

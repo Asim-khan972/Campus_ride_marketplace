@@ -82,7 +82,7 @@ export default function RideDetailsPage() {
         console.error("Error fetching ride:", err);
         setError("Failed to load ride details.");
         setLoading(false);
-      },
+      }
     );
     return () => unsubscribe();
   }, [rideId]);
@@ -263,7 +263,7 @@ export default function RideDetailsPage() {
                 <select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-black bg-white"
+                  className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-black bg-white"
                 >
                   {statuses.map((status) => (
                     <option

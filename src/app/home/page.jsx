@@ -8,12 +8,9 @@ import {
   Search,
   Wind,
   Wifi,
-  DollarSign,
   Users,
   Loader2,
   AlertCircle,
-  X,
-  Filter,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -29,6 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const extractCity = (address) => {
+  if (!address) return "";
   const parts = address.split(",").map((part) => part.trim());
   return parts[parts.length > 2 ? parts.length - 2 : parts.length - 1];
 };
@@ -63,20 +61,13 @@ export default function Home() {
   const [filteredRides, setFilteredRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyRides, setNearbyRides] = useState([]);
   const [profile, setProfile] = useState(null);
-  // Filter states
-  const [maxPrice, setMaxPrice] = useState("");
-  const [minSeats, setMinSeats] = useState("");
-  const [filterAirCond, setFilterAirCond] = useState(false);
-  const [filterWifi, setFilterWifi] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsTO, setSuggestionsTO] = useState([]);
   const [showFromSuggestions, setShowFromSuggestions] = useState(false);
   const [showToSuggestions, setShowToSuggestions] = useState(false);
-  const [sortBy, setSortBy] = useState("distance");
   const { user, loading: authLoading } = useAuth();
 
   const fromSuggestionsRef = useRef(null);
@@ -118,10 +109,35 @@ export default function Home() {
 
   useEffect(() => {
     fetchProfile();
+
+    // Set today's date as default
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+    setSearchForm((prev) => ({ ...prev, date: formattedDate }));
+
+    // Add click outside listeners for suggestion dropdowns
+    const handleClickOutside = (event) => {
+      if (
+        fromSuggestionsRef.current &&
+        !fromSuggestionsRef.current.contains(event.target)
+      ) {
+        setShowFromSuggestions(false);
+      }
+      if (
+        toSuggestionsRef.current &&
+        !toSuggestionsRef.current.contains(event.target)
+      ) {
+        setShowToSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [authLoading, router]);
 
   const fetchRidesForLocation = async (location) => {
-    console.log("location ", location);
     setLoading(true);
     try {
       const ridesRef = collection(db, "rides");
@@ -154,147 +170,29 @@ export default function Home() {
     setLoading(false);
   };
 
-  const fetchNearbyRides = async () => {
-    setLoading(true);
-    try {
-      const ridesRef = collection(db, "rides");
-      const q = query(ridesRef, orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
-
-      const fetchedRides = [];
-      querySnapshot.forEach((doc) => {
-        const ride = { id: doc.id, ...doc.data() };
-        // Only include rides not created by the current user
-        if (ride.ownerId !== user?.uid) {
-          fetchedRides.push(ride);
-        }
-      });
-
-      setRides(fetchedRides);
-      setFilteredRides(fetchedRides);
-    } catch (err) {
-      console.error("Error fetching rides:", err);
-      setError("Failed to fetch rides. Please try again.");
-    }
-    setLoading(false);
-  };
-  const handleSearch = async (e) => {
+  const handleSearch = (e) => {
     e.preventDefault();
-    if (searchForm.from === searchForm.to) {
-      setError("Pickup and destination locations cannot be the same.");
-      setLoading(false);
+
+    if (searchForm.from === "" || searchForm.to === "") {
+      setError("Pickup and Destination cannot be empty");
       return;
     }
-    setLoading(true);
-    setError("");
 
-    try {
-      const fromCity = extractCity(searchForm.from);
-      const toCity = extractCity(searchForm.to);
-
-      const ridesRef = collection(db, "rides");
-      const querySnapshot = await getDocs(ridesRef);
-
-      const matchingRides = [];
-      querySnapshot.forEach((doc) => {
-        const ride = { id: doc.id, ...doc.data() };
-        const rideFromCity = extractCity(ride.pickupLocation);
-        const rideToCity = extractCity(ride.destinationLocation);
-
-        if (
-          rideFromCity.toLowerCase().includes(fromCity.toLowerCase()) &&
-          rideToCity.toLowerCase().includes(toCity.toLowerCase())
-        ) {
-          matchingRides.push(ride);
-        }
-      });
-
-      // Sort rides by proximity to exact pickup/dropoff locations if coordinates are available
-      if (userLocation) {
-        matchingRides.sort((a, b) => {
-          const distanceA = calculateDistance(
-            userLocation.lat,
-            userLocation.lng,
-            a.pickupLat || 0,
-            a.pickupLng || 0
-          );
-          const distanceB = calculateDistance(
-            userLocation.lat,
-            userLocation.lng,
-            b.pickupLat || 0,
-            b.pickupLng || 0
-          );
-          return distanceA - distanceB;
-        });
-      }
-
-      setRides(matchingRides);
-      setFilteredRides(matchingRides);
-    } catch (err) {
-      console.error("Error searching rides:", err);
-      setError("Failed to search rides. Please try again.");
-    }
-    setLoading(false);
-  };
-
-  const handleFilter = () => {
-    let tempRides = [...rides];
-
-    // Apply filters
-    if (maxPrice) {
-      tempRides = tempRides.filter(
-        (ride) => Number(ride.pricePerSeat) <= Number(maxPrice)
-      );
-    }
-    if (minSeats) {
-      tempRides = tempRides.filter(
-        (ride) => Number(ride.availableSeats) >= Number(minSeats)
-      );
-    }
-    if (filterAirCond) {
-      tempRides = tempRides.filter((ride) => ride.airConditioning === true);
-    }
-    if (filterWifi) {
-      tempRides = tempRides.filter((ride) => ride.wifiAvailable === true);
+    if (searchForm.from === searchForm.to) {
+      setError("Pickup and destination locations cannot be the same.");
+      return;
     }
 
-    // Apply sorting
-    switch (sortBy) {
-      case "price":
-        tempRides.sort(
-          (a, b) => Number(a.pricePerSeat) - Number(b.pricePerSeat)
-        );
-        break;
-      case "date":
-        tempRides.sort(
-          (a, b) => new Date(a.startDateTime) - new Date(b.startDateTime)
-        );
-        break;
-      case "distance":
-        if (userLocation) {
-          tempRides.sort((a, b) => {
-            const distanceA = calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              a.pickupLat || 0,
-              a.pickupLng || 0
-            );
-            const distanceB = calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              b.pickupLat || 0,
-              b.pickupLng || 0
-            );
-            return distanceA - distanceB;
-          });
-        }
-        break;
-    }
+    // Create query parameters for the search page
+    const queryParams = new URLSearchParams({
+      from: searchForm.from,
+      to: searchForm.to,
+      date: searchForm.date || "",
+      passengers: searchForm.passengers || 1,
+    }).toString();
 
-    setFilteredRides(tempRides);
-    if (window.innerWidth < 768) {
-      setIsFilterOpen(false);
-    }
+    // Redirect to search page with query parameters
+    router.push(`/search-rides?${queryParams}`);
   };
 
   const formatDateTime = (dateTimeStr) => {
@@ -315,7 +213,6 @@ export default function Home() {
         `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
-      console.log("data ", data);
       setSuggestions(
         data.features.map((feature) => feature.properties.formatted)
       );
@@ -344,13 +241,24 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Search Section */}
-      <section className="bg-[#8163e9] py-8">
-        <div className="container mx-auto px-4">
+      <section className="bg-[#8163e9] py-10 md:py-16 px-4">
+        <div className="container mx-auto">
+          <div className="max-w-4xl mx-auto text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Find Your Perfect Ride
+            </h1>
+            <p className="text-white/80 text-lg">
+              Connect with drivers heading your way and travel together
+            </p>
+          </div>
           <div className="max-w-4xl mx-auto">
-            <form onSubmit={handleSearch} className="space-y-4">
+            <form
+              onSubmit={handleSearch}
+              className="space-y-5 bg-white/10 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-lg"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative" ref={fromSuggestionsRef}>
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70">
                     <MapPin className="h-5 w-5" />
                   </div>
                   <input
@@ -361,7 +269,7 @@ export default function Home() {
                       setSearchForm({ ...searchForm, from: e.target.value });
                       fetchSuggestions(e.target.value);
                     }}
-                    className="w-full pl-10 pr-3 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
+                    className="w-full pl-10 pr-3 py-3.5 rounded-lg border-0  focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
 
                   {showFromSuggestions && suggestions.length > 0 && (
@@ -386,7 +294,7 @@ export default function Home() {
                   )}
                 </div>
                 <div className="relative" ref={toSuggestionsRef}>
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70">
                     <MapPin className="h-5 w-5" />
                   </div>
                   <input
@@ -397,7 +305,7 @@ export default function Home() {
                       setSearchForm({ ...searchForm, to: e.target.value });
                       fetchSuggestionsTO(e.target.value);
                     }}
-                    className="w-full pl-10 pr-3 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
+                    className="w-full pl-10 pr-3 py-3.5 rounded-lg border-0  focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
                   {showToSuggestions && suggestionsTO.length > 0 && (
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
@@ -422,7 +330,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-white text-[#8163e9] py-3 px-6 rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-white text-[#8163e9] py-3.5 px-6 rounded-lg font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2 shadow-md"
                 >
                   {loading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -431,238 +339,134 @@ export default function Home() {
                   )}
                   Search Rides
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  className="bg-white/10 text-white py-3 px-4 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
-                >
-                  <Filter className="h-5 w-5" />
-                  <span className="hidden sm:inline">Filters</span>
-                </button>
               </div>
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-600 text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
             </form>
           </div>
         </div>
       </section>
 
       {/* Results Section */}
-      <section className="py-8">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row gap-8">
-            {/* Filters Sidebar */}
-            <div
-              className={`
-              md:w-64 bg-white rounded-lg shadow-sm border border-gray-200
-              ${
-                isFilterOpen ? "fixed inset-0 z-50 p-6" : "hidden"
-              } md:block md:static md:p-4
-            `}
-            >
-              <div className="flex items-center justify-between mb-6 md:hidden">
-                <h2 className="text-lg font-semibold">Filters</h2>
-                <button
-                  onClick={() => setIsFilterOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                {/* Sort Options */}
-                <div>
-                  <label className="block text-sm font-medium text-black mb-2">
-                    Sort by
-                  </label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] text-black focus:border-transparent"
-                  >
-                    <option value="distance" className="text-black">
-                      Distance
-                    </option>
-                    <option value="price" className="text-black">
-                      Price
-                    </option>
-                    <option value="date" className="text-black">
-                      Date
-                    </option>
-                  </select>
-                </div>
-
-                {/* Price Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Maximum Price
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="number"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
-                      placeholder="No limit"
-                    />
-                  </div>
-                </div>
-
-                {/* Seats Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Minimum Seats
-                  </label>
-                  <div className="relative">
-                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="number"
-                      value={minSeats}
-                      onChange={(e) => setMinSeats(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
-                      placeholder="Any"
-                    />
-                  </div>
-                </div>
-
-                {/* Amenities */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amenities
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filterAirCond}
-                        onChange={(e) => setFilterAirCond(e.target.checked)}
-                        className="w-4 h-4 text-[#8163e9] border-gray-300 rounded focus:ring-[#8163e9]"
-                      />
-                      <span className="text-sm text-gray-600">
-                        Air Conditioning
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filterWifi}
-                        onChange={(e) => setFilterWifi(e.target.checked)}
-                        className="w-4 h-4 text-[#8163e9] border-gray-300 rounded focus:ring-[#8163e9]"
-                      />
-                      <span className="text-sm text-gray-600">WiFi</span>
-                    </label>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleFilter}
-                  className="w-full bg-[#8163e9] text-white py-2 px-4 rounded-lg hover:bg-[#8163e9]/90 transition-colors"
-                >
-                  Apply Filters
-                </button>
+      <section className="py-10 md:py-16 px-4">
+        <div className="container mx-auto max-w-5xl">
+          {/* Rides List */}
+          {error && !loading ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-[#8163e9] mx-auto mb-4" />
+                <p className="text-gray-500">Loading available rides...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {searchForm.from && searchForm.to
+                    ? "Search Results"
+                    : "Available Rides"}
+                </h2>
+                <span className="text-sm bg-[#8163e9]/10 text-[#8163e9] px-3 py-1 rounded-full font-medium">
+                  {filteredRides.length}{" "}
+                  {filteredRides.length === 1 ? "ride" : "rides"} found
+                </span>
+              </div>
 
-            {/* Rides List */}
-            <div className="flex-1">
-              {error ? (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                </div>
-              ) : loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-[#8163e9]" />
+              {filteredRides.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center">
+                  <Car className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                    No rides found
+                  </h3>
+                  <p className="text-gray-500 max-w-md mx-auto mb-6">
+                    We couldn't find any rides matching your criteria. Try
+                    searching for a different route or check back later.
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      {searchForm.from && searchForm.to
-                        ? "Search Results"
-                        : "Available Rides"}
-                    </h2>
-                    <span className="text-sm text-gray-500">
-                      {filteredRides.length}{" "}
-                      {filteredRides.length === 1 ? "ride" : "rides"} found
-                    </span>
-                  </div>
-
-                  {filteredRides.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-                      <Car className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        No rides found
-                      </h3>
-                      <p className="text-gray-500">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-4">
-                      {filteredRides.map((ride) => (
-                        <Link key={ride.id} href={`/home/rides/${ride.id}`}>
-                          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-[#8163e9] hover:shadow-md transition-all">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-[#8163e9]" />
-                                  <span className="font-medium text-black">
-                                    {ride.pickupLocation}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-[#8163e9]" />
-                                  <span className="font-medium text-black">
-                                    {ride.destinationLocation}
-                                  </span>
-                                </div>
+                <div className="grid gap-5">
+                  {filteredRides.map((ride) => (
+                    <Link key={ride.id} href={`/rides/${ride.id}`}>
+                      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 hover:border-[#8163e9] hover:shadow-lg transition-all duration-200">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-5 gap-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-[#8163e9]/10 p-2 rounded-full">
+                                <MapPin className="h-5 w-5 text-[#8163e9]" />
                               </div>
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-[#8163e9]">
-                                  ${ride.pricePerSeat}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  per seat
-                                </div>
+                              <div>
+                                <span className="text-sm text-gray-500">
+                                  From
+                                </span>
+                                <p className="font-medium text-black">
+                                  {ride.pickupLocation}
+                                </p>
                               </div>
                             </div>
-
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4" />
-                                <span>
-                                  {formatDateTime(ride.startDateTime)}
+                            <div className="flex items-center gap-3">
+                              <div className="bg-[#8163e9]/10 p-2 rounded-full">
+                                <MapPin className="h-5 w-5 text-[#8163e9]" />
+                              </div>
+                              <div>
+                                <span className="text-sm text-gray-500">
+                                  To
                                 </span>
+                                <p className="font-medium text-black">
+                                  {ride.destinationLocation}
+                                </p>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <Users className="h-4 w-4" />
-                                <span>{ride.availableSeats} seats left</span>
-                              </div>
-                              {ride.airConditioning && (
-                                <div className="flex items-center gap-1">
-                                  <Wind className="h-4 w-4" />
-                                  <span>AC</span>
-                                </div>
-                              )}
-                              {ride.wifiAvailable && (
-                                <div className="flex items-center gap-1">
-                                  <Wifi className="h-4 w-4" />
-                                  <span>WiFi</span>
-                                </div>
-                              )}
                             </div>
                           </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+                          <div className="text-center sm:text-right">
+                            <div className="text-2xl font-bold text-[#8163e9]">
+                              ${ride.pricePerSeat}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              per seat
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
+                            <Calendar className="h-4 w-4 text-[#8163e9]" />
+                            <span>{formatDateTime(ride.startDateTime)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
+                            <Users className="h-4 w-4 text-[#8163e9]" />
+                            <span>{ride.availableSeats} seats left</span>
+                          </div>
+                          {ride.airConditioning && (
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
+                              <Wind className="h-4 w-4 text-[#8163e9]" />
+                              <span>AC</span>
+                            </div>
+                          )}
+                          {ride.wifiAvailable && (
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
+                              <Wifi className="h-4 w-4 text-[#8163e9]" />
+                              <span>WiFi</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
       </section>
     </div>

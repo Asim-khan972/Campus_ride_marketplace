@@ -125,7 +125,7 @@ export default function Footer() {
         <div className="mt-8 pt-8 border-t">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-sm text-gray-600 text-center sm:text-left">
-              © {new Date().getFullYear()} 2025 Campus App. All rights reserved.
+              © {new Date().getFullYear()} Campus App. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link

@@ -288,7 +288,7 @@ export default function RidePage({ params }) {
                       max={ride.availableSeats}
                       value={bookingSeats}
                       onChange={(e) => setBookingSeats(Number(e.target.value))}
-                      className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8163e9] focus:border-transparent text-black"
+                      className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none   focus:ring-[#8163e9] focus:border-transparent text-black"
                       required
                     />
                     <button

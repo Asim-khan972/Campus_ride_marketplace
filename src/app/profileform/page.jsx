@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, UserCircle, MapPin } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { onAuthStateChanged } from "firebase/auth";
+import Select from "react-select";
 
 const ProfileForm = () => {
   const router = useRouter();
@@ -157,6 +158,10 @@ const ProfileForm = () => {
     );
   }
 
+  const universityOptions = universityList.map((uni) => ({
+    value: uni,
+    label: uni,
+  }));
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -218,7 +223,7 @@ const ProfileForm = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                    className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                     placeholder="Enter your full name"
                   />
                 </div>
@@ -228,20 +233,20 @@ const ProfileForm = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     University
                   </label>
-                  <select
-                    value={university}
-                    disabled={!isNewProfile && university !== ""}
-                    onChange={(e) => setUniversity(e.target.value)}
-                    required
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
-                  >
-                    <option value="">Select University</option>
-                    {universityList.map((uni, idx) => (
-                      <option key={idx} value={uni}>
-                        {uni}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    value={universityOptions.find(
+                      (u) => u.value === university
+                    )}
+                    onChange={(selectedOption) =>
+                      setUniversity(selectedOption.value)
+                    }
+                    options={universityOptions}
+                    isSearchable={true}
+                    isDisabled={!isNewProfile && university !== ""}
+                    placeholder="Select University"
+                    className="w-full text-gray-900"
+                  />
+                  ;
                 </div>
 
                 {/* Location with Autocomplete */}
@@ -258,7 +263,7 @@ const ProfileForm = () => {
                         setLocation(e.target.value);
                         fetchLocationSuggestions(e.target.value);
                       }}
-                      className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                      className="w-full p-3 pl-10 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                       placeholder="Enter your location"
                       required
                     />
@@ -292,7 +297,7 @@ const ProfileForm = () => {
                     onChange={(e) => setBio(e.target.value)}
                     required
                     rows={4}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                    className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                     placeholder="Tell us about yourself"
                   ></textarea>
                 </div>

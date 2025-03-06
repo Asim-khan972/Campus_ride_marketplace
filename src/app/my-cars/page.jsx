@@ -1,10 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  deleteDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Car, Users, Hash, Calendar, X } from "lucide-react";
+import {
+  Loader2,
+  Car,
+  Users,
+  Hash,
+  Calendar,
+  X,
+  Edit,
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 import Link from "next/link";
 
 const MyCars = () => {
@@ -12,6 +30,9 @@ const MyCars = () => {
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -40,6 +61,19 @@ const MyCars = () => {
 
     return () => unsubscribe();
   }, [user]);
+
+  const handleDeleteCar = async (carId) => {
+    setDeleteLoading(true);
+    try {
+      await deleteDoc(doc(db, "cars", carId));
+      setMessage("Car deleted successfully");
+      setDeleteConfirm(null);
+    } catch (error) {
+      console.error("Error deleting car:", error);
+      setMessage("Error deleting car. Please try again.");
+    }
+    setDeleteLoading(false);
+  };
 
   if (authLoading || loading) {
     return (
@@ -102,6 +136,23 @@ const MyCars = () => {
           </Link>
         </div>
 
+        {message && (
+          <div
+            className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
+              message.includes("success") || message.includes("deleted")
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
+            {message.includes("success") || message.includes("deleted") ? (
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            )}
+            <p>{message}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {cars.map((car) => (
             <div
@@ -128,6 +179,21 @@ const MyCars = () => {
                     <Car className="w-12 h-12 text-gray-400" />
                   </div>
                 )}
+
+                {/* Action buttons */}
+                <div className="absolute top-2 right-2 flex space-x-2">
+                  <Link href={`/car-form/${car.id}`}>
+                    <button className="bg-white/90 hover:bg-white p-2 rounded-full transition-colors">
+                      <Edit className="w-4 h-4 text-[#8163e9]" />
+                    </button>
+                  </Link>
+                  <button
+                    onClick={() => setDeleteConfirm(car.id)}
+                    className="bg-white/90 hover:bg-white p-2 rounded-full transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
               </div>
 
               {/* Car Details */}
@@ -165,6 +231,34 @@ const MyCars = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Delete Confirmation */}
+                {deleteConfirm === car.id && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-700 mb-3">
+                      Are you sure you want to delete this car?
+                    </p>
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => setDeleteConfirm(null)}
+                        className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCar(car.id)}
+                        disabled={deleteLoading}
+                        className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                      >
+                        {deleteLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Delete"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Image Gallery */}
                 {car.imageURLs && car.imageURLs.length > 1 && (

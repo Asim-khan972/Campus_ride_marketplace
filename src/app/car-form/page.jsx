@@ -120,7 +120,7 @@ const CarForm = () => {
                     type="text"
                     value={carName}
                     onChange={(e) => setCarName(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                    className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                     placeholder="Enter car name"
                     required
                   />
@@ -134,7 +134,7 @@ const CarForm = () => {
                     type="text"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                    className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                     placeholder="Enter car model"
                     required
                   />
@@ -148,7 +148,7 @@ const CarForm = () => {
                     type="text"
                     value={carNumber}
                     onChange={(e) => setCarNumber(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                    className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                     placeholder="Enter License Plate Number"
                     required
                   />
@@ -162,7 +162,7 @@ const CarForm = () => {
                     type="number"
                     value={maxCapacity}
                     onChange={(e) => setMaxCapacity(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
+                    className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-gray-900"
                     placeholder="Enter max capacity"
                     required
                   />

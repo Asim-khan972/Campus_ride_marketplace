@@ -12,38 +12,32 @@ const SplashPage = () => {
 
   useEffect(() => {
     const checkVerification = async () => {
-      setTimeout(
-        async () => {
-          const user = auth.currentUser;
-          if (user) {
-            await user.reload();
-            if (user.emailVerified) {
-              router.push("/home");
-            } else {
-              const interval = setInterval(async () => {
-                await user.reload();
-                if (user.emailVerified) {
-                  clearInterval(interval);
-                  router.push("/home");
-                }
-              }, 10000);
-
-              setTimeout(
-                () => {
-                  clearInterval(interval);
-                  signOut(auth);
-                  router.push("/login");
-                },
-                30 * 60 * 1000,
-              );
-            }
+      setTimeout(async () => {
+        const user = auth.currentUser;
+        if (user) {
+          await user.reload();
+          if (user.emailVerified) {
+            router.push("/home");
           } else {
-            router.push("/login");
+            const interval = setInterval(async () => {
+              await user.reload();
+              if (user.emailVerified) {
+                clearInterval(interval);
+                router.push("/home");
+              }
+            }, 10000);
+
+            setTimeout(() => {
+              clearInterval(interval);
+              signOut(auth);
+              router.push("/login");
+            }, 30 * 60 * 1000);
           }
-          setChecking(false);
-        },
-        30 * 60 * 1000,
-      );
+        } else {
+          router.push("/login");
+        }
+        setChecking(false);
+      }, 1 * 60 * 1000);
     };
 
     checkVerification();

@@ -73,7 +73,7 @@ const PublishRide = () => {
       (error) => {
         console.error("Error fetching cars:", error);
         setLoadingCars(false);
-      },
+      }
     );
 
     return () => unsubscribe();
@@ -174,11 +174,11 @@ const PublishRide = () => {
     if (!input) return setPickupSuggestions([]);
     try {
       const response = await fetch(
-        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`,
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
       setPickupSuggestions(
-        data.features.map((feature) => feature.properties.formatted),
+        data.features.map((feature) => feature.properties.formatted)
       );
       setShowPickupSuggestions(true);
     } catch (error) {
@@ -190,11 +190,11 @@ const PublishRide = () => {
     if (!input) return setDestinationSuggestions([]);
     try {
       const response = await fetch(
-        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`,
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
       setDestinationSuggestions(
-        data.features.map((feature) => feature.properties.formatted),
+        data.features.map((feature) => feature.properties.formatted)
       );
       setShowDestinationSuggestions(true);
     } catch (error) {
@@ -305,7 +305,7 @@ const PublishRide = () => {
                   <select
                     value={selectedCarId}
                     onChange={(e) => setSelectedCarId(e.target.value)}
-                    className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border border-gray-300 text-black rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   >
                     <option value="">-- Choose a car --</option>
@@ -329,7 +329,7 @@ const PublishRide = () => {
                     onChange={(e) => setAvailableSeats(e.target.value)}
                     min="1"
                     max="8"
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                 </div>
@@ -346,7 +346,7 @@ const PublishRide = () => {
                     onChange={(e) => setPricePerSeat(e.target.value)}
                     min="0"
                     step="0.01"
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                 </div>
@@ -381,7 +381,7 @@ const PublishRide = () => {
                         onChange={(e) => setTollPrice(e.target.value)}
                         min="0"
                         step="0.01"
-                        className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                        className="w-full p-3 border border-gray-300 text-black rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                         required
                       />
                     </div>
@@ -402,7 +402,7 @@ const PublishRide = () => {
                       setPickupLocation(e.target.value);
                       fetchPickupSuggestions(e.target.value);
                     }}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                   {showPickupSuggestions && pickupSuggestions.length > 0 && (
@@ -436,7 +436,7 @@ const PublishRide = () => {
                       setDestinationLocation(e.target.value);
                       fetchDestinationSuggestions(e.target.value);
                     }}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                   {showDestinationSuggestions &&
@@ -468,7 +468,7 @@ const PublishRide = () => {
                     type="datetime-local"
                     value={startDateTime}
                     onChange={(e) => setStartDateTime(e.target.value)}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                 </div>
@@ -483,7 +483,7 @@ const PublishRide = () => {
                     type="datetime-local"
                     value={endDateTime}
                     onChange={(e) => setEndDateTime(e.target.value)}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                 </div>
