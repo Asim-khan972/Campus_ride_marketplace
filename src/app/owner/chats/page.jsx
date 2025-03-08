@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import {
@@ -17,10 +18,14 @@ import {
   AlertCircle,
   ChevronRight,
   UserCircle,
+  CheckCheck,
+  ChevronLeft,
 } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function OwnerChatInbox() {
+  const router = useRouter();
   const { user } = useAuth();
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,13 +70,24 @@ export default function OwnerChatInbox() {
             const otherUser =
               userDetails.find((u) => u.id !== user.uid) || null;
 
+            // Get unread count for current user
+            const unreadCount = chat.unreadCount?.[user.uid] || 0;
+
             return {
               ...chat,
               userDetails,
               otherUser,
+              unreadCount,
             };
           })
         );
+
+        // Sort chats by updatedAt timestamp (most recent first)
+        chatsWithUsers.sort((a, b) => {
+          if (!a.updatedAt) return 1;
+          if (!b.updatedAt) return -1;
+          return b.updatedAt.seconds - a.updatedAt.seconds;
+        });
 
         setChats(chatsWithUsers);
         setLoading(false);
@@ -83,6 +99,33 @@ export default function OwnerChatInbox() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Format the timestamp to a readable format
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return "";
+
+    const date = new Date(timestamp.seconds * 1000);
+    const now = new Date();
+
+    // If today, show time
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    // If this week, show day name
+    const diffDays = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: "short" });
+    }
+
+    // Otherwise show date
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
 
   if (!user) {
     return (
@@ -118,6 +161,15 @@ export default function OwnerChatInbox() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
+        {/* Back Button */}
+        <button
+          onClick={() => router.back()}
+          className="mb-6 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ChevronLeft className="h-5 w-5 mr-1" />
+          <span>Go Back</span>
+        </button>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -147,14 +199,22 @@ export default function OwnerChatInbox() {
           <div className="space-y-4">
             {chats.map((chat) => (
               <Link key={chat.id} href={`/chat/${chat.id}`} className="block">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                <div
+                  className={`bg-white rounded-lg shadow-sm border ${
+                    chat.unreadCount > 0
+                      ? "border-[#8163e9]/30 bg-[#8163e9]/5"
+                      : "border-gray-200"
+                  } p-4 hover:shadow-md transition-shadow`}
+                >
                   <div className="flex items-center gap-4">
                     {/* User Avatar */}
                     <div className="flex-shrink-0">
                       {chat.otherUser?.profilePicURL ? (
                         <div className="relative w-12 h-12 rounded-full overflow-hidden">
                           <Image
-                            src={chat.otherUser.profilePicURL}
+                            src={
+                              chat.otherUser.profilePicURL || "/placeholder.svg"
+                            }
                             alt={chat.otherUser.fullName}
                             fill
                             className="object-cover"
@@ -171,7 +231,13 @@ export default function OwnerChatInbox() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center space-x-2">
-                          <span className="font-medium text-black truncate">
+                          <span
+                            className={`font-medium ${
+                              chat.unreadCount > 0
+                                ? "text-black font-semibold"
+                                : "text-black"
+                            } truncate`}
+                          >
                             {chat.otherUser?.fullName || "Unknown User"}
                           </span>
                           {chat.unreadCount > 0 && (
@@ -182,17 +248,28 @@ export default function OwnerChatInbox() {
                         </div>
                         <span className="text-sm text-gray-500">
                           {chat.updatedAt
-                            ? new Date(
-                                chat.updatedAt.seconds * 1000
-                              ).toLocaleDateString()
+                            ? formatTimestamp(chat.updatedAt)
                             : "No messages yet"}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600 truncate">
-                          {chat.lastMessage || "No messages yet"}
-                        </p>
+                        <div className="flex items-center space-x-1 max-w-[80%]">
+                          {/* Show double check for seen messages sent by current user */}
+                          {chat.lastMessageSenderId === user.uid &&
+                            chat.lastMessageSeen && (
+                              <CheckCheck className="h-3.5 w-3.5 text-[#8163e9] flex-shrink-0" />
+                            )}
+                          <p
+                            className={`text-sm ${
+                              chat.unreadCount > 0
+                                ? "text-black font-medium"
+                                : "text-gray-600"
+                            } truncate`}
+                          >
+                            {chat.lastMessage || "No messages yet"}
+                          </p>
+                        </div>
                         <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
                       </div>
                     </div>

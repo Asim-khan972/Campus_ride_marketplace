@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 import {
   Calendar,
@@ -68,16 +67,22 @@ export default function SearchRides() {
   // Filter states
   const [maxPrice, setMaxPrice] = useState("");
   const [minSeats, setMinSeats] = useState("");
-  const [filterAirCond, setFilterAirCond] = useState(false);
-  const [filterWifi, setFilterWifi] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [suggestionsTO, setSuggestionsTO] = useState([]);
-  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
-  const [showToSuggestions, setShowToSuggestions] = useState(false);
   const [sortBy, setSortBy] = useState("distance");
 
-  const fromSuggestionsRef = useRef(null);
-  const toSuggestionsRef = useRef(null);
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [pickupCity, setPickupCity] = useState("");
+  const [pickupSuggestions, setPickupSuggestions] = useState([]);
+  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+
+  // For Destination Location
+  const [destinationLocation, setDestinationLocation] = useState("");
+  const [destinationCity, setDestinationCity] = useState("");
+  const [destinationSuggestions, setDestinationSuggestions] = useState([]);
+  const [showDestinationSuggestions, setShowDestinationSuggestions] =
+    useState(false);
+
+  const pickupSuggestionsRef = useRef(null);
+  const destinationSuggestionsRef = useRef(null);
 
   useEffect(() => {
     // Get search parameters from URL
@@ -85,6 +90,11 @@ export default function SearchRides() {
     const to = searchParams.get("to") || "";
     const date = searchParams.get("date") || "";
     const passengers = searchParams.get("passengers") || 1;
+    const pick = searchParams.get("pickupCity") || "";
+    const destination = searchParams.get("destinationCity") || "";
+
+    setPickupCity(pick);
+    setDestinationCity(destination);
 
     setSearchForm({
       from,
@@ -103,16 +113,16 @@ export default function SearchRides() {
     // Add click outside listeners for suggestion dropdowns
     const handleClickOutside = (event) => {
       if (
-        fromSuggestionsRef.current &&
-        !fromSuggestionsRef.current.contains(event.target)
+        pickupSuggestionsRef.current &&
+        !pickupSuggestionsRef.current.contains(event.target)
       ) {
-        setShowFromSuggestions(false);
+        setShowPickupSuggestions(false);
       }
       if (
-        toSuggestionsRef.current &&
-        !toSuggestionsRef.current.contains(event.target)
+        destinationSuggestionsRef.current &&
+        !destinationSuggestionsRef.current.contains(event.target)
       ) {
-        setShowToSuggestions(false);
+        setShowDestinationSuggestions(false);
       }
     };
 
@@ -152,7 +162,22 @@ export default function SearchRides() {
             !rideToCity.toLowerCase().includes(toCity.toLowerCase())
           ) {
             console.log("non matching ride", ride);
-            otherAvailableRides.push(ride);
+            console.log(
+              "ride",
+              ride.pickupCity,
+              "local",
+              pickupCity,
+              "dest",
+              ride.destinationCity,
+              "local desti",
+              destinationCity
+            );
+            if (
+              ride.pickupCity == pickupCity &&
+              ride.destinationCity == destinationCity
+            ) {
+              otherAvailableRides.push(ride);
+            }
           }
         }
       });
@@ -188,10 +213,10 @@ export default function SearchRides() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (searchForm.from === searchForm.to) {
-      setError("Pickup and destination locations cannot be the same.");
-      return;
-    }
+    // if (searchForm.from === searchForm.to) {
+    //   setError("Pickup and destination locations cannot be the same.");
+    //   return;
+    // }
 
     // Update URL with new search parameters
     const queryParams = new URLSearchParams({
@@ -199,6 +224,8 @@ export default function SearchRides() {
       to: searchForm.to,
       date: searchForm.date,
       passengers: searchForm.passengers,
+      pickupCity: pickupCity,
+      destinationCity: destinationCity,
     }).toString();
 
     router.push(`/search-rides?${queryParams}`);
@@ -220,12 +247,6 @@ export default function SearchRides() {
       tempRides = tempRides.filter(
         (ride) => Number(ride.availableSeats) >= Number(minSeats)
       );
-    }
-    if (filterAirCond) {
-      tempRides = tempRides.filter((ride) => ride.airConditioning === true);
-    }
-    if (filterWifi) {
-      tempRides = tempRides.filter((ride) => ride.wifiAvailable === true);
     }
 
     // Apply sorting
@@ -278,39 +299,44 @@ export default function SearchRides() {
     });
   };
 
-  const fetchSuggestions = async (input) => {
-    if (!input) return setSuggestions([]);
+  const fetchPickupSuggestions = async (input) => {
+    if (!input) return setPickupSuggestions([]);
     try {
       const response = await fetch(
         `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
-      setSuggestions(
-        data.features.map((feature) => feature.properties.formatted)
-      );
-      setShowFromSuggestions(true);
+      const suggestions = data.features.map((feature) => ({
+        formatted: feature.properties.formatted,
+        city: feature.properties.city || "",
+      }));
+      setPickupSuggestions(suggestions);
+      setShowPickupSuggestions(true);
     } catch (error) {
-      console.error("Error fetching autocomplete suggestions:", error);
+      console.error("Error fetching pickup suggestions:", error);
     }
   };
 
-  const fetchSuggestionsTO = async (input) => {
-    if (!input) return setSuggestionsTO([]);
+  const fetchDestinationSuggestions = async (input) => {
+    if (!input) return setDestinationSuggestions([]);
     try {
       const response = await fetch(
         `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
-      setSuggestionsTO(
-        data.features.map((feature) => feature.properties.formatted)
-      );
-      setShowToSuggestions(true);
+      const suggestions = data.features.map((feature) => ({
+        formatted: feature.properties.formatted,
+        city: feature.properties.city || "",
+      }));
+      setDestinationSuggestions(suggestions);
+      setShowDestinationSuggestions(true);
     } catch (error) {
-      console.error("Error fetching autocomplete suggestions:", error);
+      console.error("Error fetching destination suggestions:", error);
     }
   };
 
   console.log("other countries", otherRides);
+  console.log("destination city ", destinationCity, "pcikup city ", pickupCity);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -332,7 +358,7 @@ export default function SearchRides() {
           <div className="max-w-4xl mx-auto">
             <form onSubmit={handleSearch} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative" ref={fromSuggestionsRef}>
+                <div className="relative" ref={pickupSuggestionsRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                     <MapPin className="h-5 w-5" />
                   </div>
@@ -342,33 +368,38 @@ export default function SearchRides() {
                     value={searchForm.from}
                     onChange={(e) => {
                       setSearchForm({ ...searchForm, from: e.target.value });
-                      fetchSuggestions(e.target.value);
+                      fetchPickupSuggestions(e.target.value);
                     }}
                     className="w-full pl-10 pr-3 py-3 rounded-lg border-0   focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
 
-                  {showFromSuggestions && suggestions.length > 0 && (
+                  {showPickupSuggestions && pickupSuggestions.length > 0 && (
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {suggestions.map((suggestion, index) => (
+                      {pickupSuggestions.map((suggestion, index) => (
                         <li
                           key={index}
                           onClick={() => {
                             setSearchForm({
                               ...searchForm,
-                              from: suggestion,
+                              from: suggestion.formatted,
                             });
-                            setShowFromSuggestions(false);
-                            setSuggestions([]);
+                            setPickupCity(suggestion.city);
+                            setShowPickupSuggestions(false);
                           }}
                           className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
                         >
-                          {suggestion}
+                          {suggestion.formatted}
+                          {suggestion.city && (
+                            <span className="block text-xs text-gray-500 mt-1">
+                              City: {suggestion.city}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
-                <div className="relative" ref={toSuggestionsRef}>
+                <div className="relative" ref={destinationSuggestionsRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                     <MapPin className="h-5 w-5" />
                   </div>
@@ -378,27 +409,36 @@ export default function SearchRides() {
                     value={searchForm.to}
                     onChange={(e) => {
                       setSearchForm({ ...searchForm, to: e.target.value });
-                      fetchSuggestionsTO(e.target.value);
+                      fetchDestinationSuggestions(e.target.value);
                     }}
                     className="w-full pl-10 pr-3 py-3 rounded-lg border-0   focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
-                  {showToSuggestions && suggestionsTO.length > 0 && (
-                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {suggestionsTO.map((suggestion, index) => (
-                        <li
-                          key={index}
-                          onClick={() => {
-                            setSearchForm({ ...searchForm, to: suggestion });
-                            setShowToSuggestions(false);
-                            setSuggestionsTO([]);
-                          }}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
-                        >
-                          {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  {showDestinationSuggestions &&
+                    destinationSuggestions.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {destinationSuggestions.map((suggestion, index) => (
+                          <li
+                            key={index}
+                            onClick={() => {
+                              setSearchForm({
+                                ...searchForm,
+                                to: suggestion.formatted,
+                              });
+                              setDestinationCity(suggestion.city);
+                              setShowDestinationSuggestions(false);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
+                          >
+                            {suggestion.formatted}
+                            {suggestion.city && (
+                              <span className="block text-xs text-gray-500 mt-1">
+                                City: {suggestion.city}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                 </div>
               </div>
               <div className="flex gap-4">
@@ -504,35 +544,6 @@ export default function SearchRides() {
                       className="w-full pl-9 pr-3 py-2 border rounded-md   focus:ring-[#8163e9] focus:border-transparent"
                       placeholder="Any"
                     />
-                  </div>
-                </div>
-
-                {/* Amenities */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amenities
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filterAirCond}
-                        onChange={(e) => setFilterAirCond(e.target.checked)}
-                        className="w-4 h-4 text-[#8163e9] border-gray-300 rounded focus:ring-[#8163e9]"
-                      />
-                      <span className="text-sm text-gray-600">
-                        Air Conditioning
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filterWifi}
-                        onChange={(e) => setFilterWifi(e.target.checked)}
-                        className="w-4 h-4 text-[#8163e9] border-gray-300 rounded focus:ring-[#8163e9]"
-                      />
-                      <span className="text-sm text-gray-600">WiFi</span>
-                    </label>
                   </div>
                 </div>
 

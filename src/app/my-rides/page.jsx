@@ -1,9 +1,16 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  deleteDoc,
+} from "firebase/firestore";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
   MapPin,
@@ -16,6 +23,10 @@ import {
   Wifi,
   Wind,
   ChevronRight,
+  ChevronLeft,
+  Trash2,
+  X,
+  CheckCircle2,
 } from "lucide-react";
 
 const statusColors = {
@@ -38,10 +49,14 @@ const formatDateTime = (dateTimeStr) => {
 };
 
 export default function DriverDashboard() {
+  const router = useRouter();
   const { user } = useAuth();
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -66,20 +81,33 @@ export default function DriverDashboard() {
         console.error("Error fetching rides:", err);
         setError("Failed to load rides. Please try again.");
         setLoading(false);
-      },
+      }
     );
 
     return () => unsubscribe();
   }, [user]);
 
+  const handleDeleteRide = async (rideId) => {
+    setDeleteLoading(true);
+    try {
+      await deleteDoc(doc(db, "rides", rideId));
+      setMessage("Ride deleted successfully");
+      setDeleteConfirm(null);
+    } catch (error) {
+      console.error("Error deleting ride:", error);
+      setMessage("Error deleting ride. Please try again.");
+    }
+    setDeleteLoading(false);
+  };
+
   const currentStatuses = ["not_started", "waiting_for_customer", "started"];
   const previousStatuses = ["finished", "cancelled"];
 
   const currentRides = rides.filter((ride) =>
-    currentStatuses.includes(ride.status),
+    currentStatuses.includes(ride.status)
   );
   const previousRides = rides.filter((ride) =>
-    previousStatuses.includes(ride.status),
+    previousStatuses.includes(ride.status)
   );
 
   if (!user) {
@@ -140,11 +168,47 @@ export default function DriverDashboard() {
             {ride.status.replace(/_/g, " ").charAt(0).toUpperCase() +
               ride.status.slice(1).replace(/_/g, " ")}
           </span>
-          <div className="flex items-center text-sm text-black">
-            <Clock className="h-4 w-4 mr-1 text-[#8163e9]" />
-            <span>{formatDateTime(ride.startDateTime)}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center text-sm text-black">
+              <Clock className="h-4 w-4 mr-1 text-[#8163e9]" />
+              <span>{formatDateTime(ride.startDateTime)}</span>
+            </div>
+            <button
+              onClick={() => setDeleteConfirm(ride.id)}
+              className="p-1 hover:bg-red-50 rounded-full transition-colors"
+              aria-label="Delete ride"
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </button>
           </div>
         </div>
+
+        {/* Delete Confirmation */}
+        {deleteConfirm === ride.id && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 text-sm mb-2">
+              Are you sure you want to delete this ride?
+            </p>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-1.5 px-3 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteRide(ride.id)}
+                disabled={deleteLoading}
+                className="flex-1 py-1.5 px-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm flex items-center justify-center"
+              >
+                {deleteLoading && deleteConfirm === ride.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : null}
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Locations */}
         <div className="space-y-3 mb-4">
@@ -180,30 +244,6 @@ export default function DriverDashboard() {
           </div>
         </div>
 
-        {/* Amenities */}
-        <div className="flex items-center space-x-4 mb-4">
-          {ride.wifiAvailable && (
-            <div className="flex items-center space-x-1">
-              <Wifi className="h-4 w-4 text-[#8163e9]" />
-              <span className="text-sm text-black">WiFi</span>
-            </div>
-          )}
-          {ride.airConditioning && (
-            <div className="flex items-center space-x-1">
-              <Wind className="h-4 w-4 text-[#8163e9]" />
-              <span className="text-sm text-black">AC</span>
-            </div>
-          )}
-          {ride.tollsIncluded && (
-            <div className="flex items-center space-x-1">
-              <Car className="h-4 w-4 text-[#8163e9]" />
-              <span className="text-sm text-black">
-                Toll included (${ride.tollPrice})
-              </span>
-            </div>
-          )}
-        </div>
-
         {/* Action Button */}
         <Link
           href={`/my-rides/${ride.id}`}
@@ -220,13 +260,21 @@ export default function DriverDashboard() {
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-black">
-              Driver Dashboard
-            </h1>
-            <p className="text-gray-500 mt-1">
-              Manage your rides and track your trips
-            </p>
+          <div className="flex items-center">
+            <button
+              onClick={() => router.back()}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors mr-2"
+            >
+              <ChevronLeft className="h-6 w-6 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-black">
+                Driver Dashboard
+              </h1>
+              <p className="text-gray-500 mt-1">
+                Manage your rides and track your trips
+              </p>
+            </div>
           </div>
           <Link
             href="/publish-ride"
@@ -235,6 +283,29 @@ export default function DriverDashboard() {
             Create New Ride
           </Link>
         </div>
+
+        {message && (
+          <div
+            className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
+              message.includes("success") || message.includes("deleted")
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
+            {message.includes("success") || message.includes("deleted") ? (
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            )}
+            <p>{message}</p>
+            <button
+              onClick={() => setMessage("")}
+              className="ml-auto hover:bg-gray-200 p-1 rounded-full"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         <div className="space-y-8">
           {/* Current Rides */}

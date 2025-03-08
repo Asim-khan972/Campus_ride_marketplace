@@ -242,7 +242,7 @@ const ProfileForm = () => {
                     }
                     options={universityOptions}
                     isSearchable={true}
-                    isDisabled={!isNewProfile && university !== ""}
+                    // isDisabled={!isNewProfile && university !== ""}
                     placeholder="Select University"
                     className="w-full text-gray-900"
                   />

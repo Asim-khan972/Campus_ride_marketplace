@@ -1,17 +1,20 @@
 import Link from "next/link";
-import {
-  Shield,
-  Users,
-  Star,
-  Award,
-  ChevronRight,
-  Car,
-  Globe,
-} from "lucide-react";
+import { Shield, Users, Globe, ChevronLeft } from "lucide-react";
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Back Button */}
+      <div className="container px-4 pt-3 pb-3">
+        <Link
+          href="/my-profile"
+          className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ChevronLeft className="h-5 w-5 mr-1" />
+          <span>Go Back</span>
+        </Link>
+      </div>
+
       {/* Hero Section */}
       <section className="relative bg-[#8163e9] text-white py-16 md:py-24">
         <div className="container mx-auto px-4">

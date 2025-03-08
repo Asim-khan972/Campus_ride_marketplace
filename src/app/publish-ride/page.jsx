@@ -29,6 +29,7 @@ const PublishRide = () => {
   const { user, loading: authLoading } = useAuth();
   const [cars, setCars] = useState([]);
   const [loadingCars, setLoadingCars] = useState(true);
+  const [selectedCar, setSelectedCar] = useState(null);
 
   // Form fields
   const [selectedCarId, setSelectedCarId] = useState("");
@@ -38,17 +39,17 @@ const PublishRide = () => {
   const [tollPrice, setTollPrice] = useState("");
   const [startDateTime, setStartDateTime] = useState("");
   const [endDateTime, setEndDateTime] = useState("");
-  const [airConditioning, setAirConditioning] = useState(false);
-  const [wifiAvailable, setWifiAvailable] = useState(false);
   const [status, setStatus] = useState("not_started"); // default status
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pickupLocation, setPickupLocation] = useState("");
+  const [pickupCity, setPickupCity] = useState("");
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
 
   // For Destination Location
   const [destinationLocation, setDestinationLocation] = useState("");
+  const [destinationCity, setDestinationCity] = useState("");
   const [destinationSuggestions, setDestinationSuggestions] = useState([]);
   const [showDestinationSuggestions, setShowDestinationSuggestions] =
     useState(false);
@@ -78,6 +79,18 @@ const PublishRide = () => {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Update selected car when car ID changes
+  useEffect(() => {
+    if (selectedCarId) {
+      const car = cars.find((car) => car.id === selectedCarId);
+      setSelectedCar(car);
+      // Reset available seats when car changes
+      setAvailableSeats("");
+    } else {
+      setSelectedCar(null);
+    }
+  }, [selectedCarId, cars]);
 
   // Set up click outside listeners for suggestion dropdowns
   useEffect(() => {
@@ -139,11 +152,11 @@ const PublishRide = () => {
         tollsIncluded,
         tollPrice: toll,
         pickupLocation,
+        pickupCity,
         destinationLocation,
+        destinationCity,
         startDateTime,
         endDateTime,
-        airConditioning,
-        wifiAvailable,
         status,
         createdAt: serverTimestamp(),
       };
@@ -157,12 +170,13 @@ const PublishRide = () => {
       setTollsIncluded(false);
       setTollPrice("");
       setPickupLocation("");
+      setPickupCity("");
       setDestinationLocation("");
+      setDestinationCity("");
       setStartDateTime("");
       setEndDateTime("");
-      setAirConditioning(false);
-      setWifiAvailable(false);
       setStatus("not_started");
+      router.push("/my-rides");
     } catch (error) {
       console.error("Error publishing ride:", error);
       setMessage("Error publishing ride. Please try again.");
@@ -177,9 +191,11 @@ const PublishRide = () => {
         `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
-      setPickupSuggestions(
-        data.features.map((feature) => feature.properties.formatted)
-      );
+      const suggestions = data.features.map((feature) => ({
+        formatted: feature.properties.formatted,
+        city: feature.properties.city || "",
+      }));
+      setPickupSuggestions(suggestions);
       setShowPickupSuggestions(true);
     } catch (error) {
       console.error("Error fetching pickup suggestions:", error);
@@ -193,9 +209,11 @@ const PublishRide = () => {
         `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
-      setDestinationSuggestions(
-        data.features.map((feature) => feature.properties.formatted)
-      );
+      const suggestions = data.features.map((feature) => ({
+        formatted: feature.properties.formatted,
+        city: feature.properties.city || "",
+      }));
+      setDestinationSuggestions(suggestions);
       setShowDestinationSuggestions(true);
     } catch (error) {
       console.error("Error fetching destination suggestions:", error);
@@ -252,17 +270,18 @@ const PublishRide = () => {
     );
   }
 
+  console.log("cars", cars);
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         {/* Header with back button */}
         <div className="flex items-center gap-4 mb-6">
-          <Link
-            href="/profile"
+          <button
+            onClick={() => router.back()}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ChevronLeft className="h-6 w-6 text-gray-600" />
-          </Link>
+          </button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-black">
               Publish a Ride
@@ -311,7 +330,7 @@ const PublishRide = () => {
                     <option value="">-- Choose a car --</option>
                     {cars.map((car) => (
                       <option key={car.id} value={car.id}>
-                        {car.make} {car.model} ({car.year}) - {car.color}
+                        {car.carName} {car.carNumber} {car.model}
                       </option>
                     ))}
                   </select>
@@ -323,15 +342,35 @@ const PublishRide = () => {
                     <Users className="h-4 w-4 mr-2 text-[#8163e9]" />
                     Available Seats
                   </label>
-                  <input
-                    type="number"
-                    value={availableSeats}
-                    onChange={(e) => setAvailableSeats(e.target.value)}
-                    min="1"
-                    max="8"
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
-                    required
-                  />
+                  {selectedCar ? (
+                    <select
+                      value={availableSeats}
+                      onChange={(e) => setAvailableSeats(e.target.value)}
+                      className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                      required
+                    >
+                      <option value="">-- Select seats --</option>
+                      {[...Array(parseInt(selectedCar.maxCapacity))].map(
+                        (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      value={availableSeats}
+                      onChange={(e) => setAvailableSeats(e.target.value)}
+                      min="1"
+                      max="8"
+                      className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                      required
+                      disabled={!selectedCar}
+                      placeholder="Select a car first"
+                    />
+                  )}
                 </div>
 
                 {/* Price Per Seat */}
@@ -411,12 +450,18 @@ const PublishRide = () => {
                         <li
                           key={index}
                           onClick={() => {
-                            setPickupLocation(suggestion);
+                            setPickupLocation(suggestion.formatted);
+                            setPickupCity(suggestion.city);
                             setShowPickupSuggestions(false);
                           }}
                           className="p-3 hover:bg-gray-100 cursor-pointer text-sm text-gray-800 border-b border-gray-100 last:border-b-0"
                         >
-                          {suggestion}
+                          {suggestion.formatted}
+                          {suggestion.city && (
+                            <span className="block text-xs text-gray-500 mt-1">
+                              City: {suggestion.city}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -446,12 +491,18 @@ const PublishRide = () => {
                           <li
                             key={index}
                             onClick={() => {
-                              setDestinationLocation(suggestion);
+                              setDestinationLocation(suggestion.formatted);
+                              setDestinationCity(suggestion.city);
                               setShowDestinationSuggestions(false);
                             }}
                             className="p-3 hover:bg-gray-100 cursor-pointer text-sm text-gray-800 border-b border-gray-100 last:border-b-0"
                           >
-                            {suggestion}
+                            {suggestion.formatted}
+                            {suggestion.city && (
+                              <span className="block text-xs text-gray-500 mt-1">
+                                City: {suggestion.city}
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -464,13 +515,15 @@ const PublishRide = () => {
                     <Calendar className="h-4 w-4 mr-2 text-[#8163e9]" />
                     Start Date & Time
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={startDateTime}
-                    onChange={(e) => setStartDateTime(e.target.value)}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="datetime-local"
+                      value={startDateTime}
+                      onChange={(e) => setStartDateTime(e.target.value)}
+                      className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* End Date & Time */}
@@ -479,54 +532,14 @@ const PublishRide = () => {
                     <Calendar className="h-4 w-4 mr-2 text-[#8163e9]" />
                     End Date & Time
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={endDateTime}
-                    onChange={(e) => setEndDateTime(e.target.value)}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
-                    required
-                  />
-                </div>
-
-                {/* Amenities Section */}
-                <div className="col-span-2 bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-black mb-3">
-                    Amenities
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Air Conditioning */}
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="airConditioning"
-                        checked={airConditioning}
-                        onChange={(e) => setAirConditioning(e.target.checked)}
-                        className="w-4 h-4 text-[#8163e9] border-gray-300 rounded focus:ring-[#8163e9]"
-                      />
-                      <label
-                        htmlFor="airConditioning"
-                        className="text-sm font-medium text-black"
-                      >
-                        Air Conditioning Available
-                      </label>
-                    </div>
-
-                    {/* WiFi Available */}
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="wifiAvailable"
-                        checked={wifiAvailable}
-                        onChange={(e) => setWifiAvailable(e.target.checked)}
-                        className="w-4 h-4 text-[#8163e9] border-gray-300 rounded focus:ring-[#8163e9]"
-                      />
-                      <label
-                        htmlFor="wifiAvailable"
-                        className="text-sm font-medium text-black"
-                      >
-                        WiFi Available
-                      </label>
-                    </div>
+                  <div className="relative">
+                    <input
+                      type="datetime-local"
+                      value={endDateTime}
+                      onChange={(e) => setEndDateTime(e.target.value)}
+                      className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                      required
+                    />
                   </div>
                 </div>
               </div>

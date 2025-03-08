@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/firebase";
 import {
@@ -10,12 +11,21 @@ import {
   serverTimestamp,
   getDoc,
   doc,
+  updateDoc,
+  where,
+  getDocs,
 } from "firebase/firestore";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Send, ChevronLeft, UserCircle, Loader2 } from "lucide-react";
+import {
+  Send,
+  ChevronLeft,
+  UserCircle,
+  Loader2,
+  Check,
+  CheckCheck,
+} from "lucide-react";
 import Image from "next/image";
-import { sendChatNotification } from "@/utils/action";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -28,8 +38,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const messagesEndRef = useRef(null);
-  const lastMessageRef = useRef(null);
-  const processedMessageIds = useRef(new Set());
+  const [isUserActive, setIsUserActive] = useState(true);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -77,89 +86,86 @@ export default function ChatPage() {
     fetchChatAndUserDetails();
   }, [chatId, user]);
 
-  // Handle sending notification for new messages
-  const handleNewMessageNotification = async (message) => {
-    if (!message || !otherUser || !user) {
-      console.log("Missing required data for notification:", {
-        message,
-        otherUser,
-        user,
-      });
-      return;
-    }
+  // Track user activity to mark messages as seen
+  useEffect(() => {
+    const handleActivity = () => setIsUserActive(true);
+    const handleInactivity = () => setIsUserActive(false);
 
-    // Skip if we've already processed this message
-    if (processedMessageIds.current.has(message.id)) {
-      return;
-    }
+    window.addEventListener("focus", handleActivity);
+    window.addEventListener("blur", handleInactivity);
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("touchstart", handleActivity);
 
-    // Mark this message as processed
-    processedMessageIds.current.add(message.id);
+    // Set initial state
+    setIsUserActive(document.hasFocus());
 
-    try {
-      console.log("Preparing to send notification for message:", message.text);
+    return () => {
+      window.removeEventListener("focus", handleActivity);
+      window.removeEventListener("blur", handleInactivity);
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("touchstart", handleActivity);
+    };
+  }, []);
 
-      // Only send notification if the message is from the other user
-      if (message.senderId !== user.uid) {
-        console.log("Sending notification to:", user.email);
+  // Mark messages as seen when user is active
+  useEffect(() => {
+    if (!chatId || !user || !isUserActive) return;
 
-        await sendChatNotification({
-          to: user.email,
-          senderName: otherUser.fullName || "Someone",
-          message: message.text,
-          chatId: chatId,
+    const markMessagesAsSeen = async () => {
+      try {
+        const messagesRef = collection(db, "chats", chatId, "messages");
+        const q = query(
+          messagesRef,
+          where("senderId", "!=", user.uid),
+          where("seen", "==", false)
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        const batch = [];
+        querySnapshot.forEach((doc) => {
+          batch.push(
+            updateDoc(doc.ref, { seen: true, seenAt: serverTimestamp() })
+          );
         });
 
-        console.log("Notification sent successfully");
-      } else {
-        console.log("Skipping notification for own message");
+        if (batch.length > 0) {
+          await Promise.all(batch);
+          console.log(`Marked ${batch.length} messages as seen`);
+
+          // Update unread count in the chat document
+          await updateDoc(doc(db, "chats", chatId), {
+            [`unreadCount.${user.uid}`]: 0,
+          });
+        }
+      } catch (error) {
+        console.error("Error marking messages as seen:", error);
       }
-    } catch (error) {
-      console.error("Error sending notification:", error);
-    }
-  };
+    };
 
-  // Fetch messages and handle notifications
+    // Mark messages as seen when component mounts and user is active
+    markMessagesAsSeen();
+
+    // Set up interval to periodically mark messages as seen while user is active
+    const interval = setInterval(markMessagesAsSeen, 5000);
+
+    return () => clearInterval(interval);
+  }, [chatId, user, isUserActive]);
+
+  // Fetch messages
   useEffect(() => {
-    if (!chatId || !user || !otherUser) return;
-
-    console.log("Setting up message listener");
-
+    if (!chatId) return;
     const messagesRef = collection(db, "chats", chatId, "messages");
     const q = query(messagesRef, orderBy("createdAt", "asc"));
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = [];
-
-      // Process new messages
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const msgData = { id: change.doc.id, ...change.doc.data() };
-
-          // Check if this is a new message not sent by the current user
-          if (
-            msgData.senderId !== user.uid &&
-            msgData.createdAt &&
-            Date.now() - msgData.createdAt.toMillis() < 30000 && // Increased time window to 30 seconds
-            !processedMessageIds.current.has(msgData.id)
-          ) {
-            console.log("New message detected:", msgData.text);
-            // Process notification in the next tick to ensure we have the full message data
-            setTimeout(() => handleNewMessageNotification(msgData), 0);
-          }
-        }
-      });
-
-      // Update messages state
       snapshot.forEach((doc) => msgs.push({ id: doc.id, ...doc.data() }));
       setMessages(msgs);
     });
-
-    return () => {
-      console.log("Cleaning up message listener");
-      unsubscribe();
-    };
-  }, [chatId, user, otherUser]);
+    return () => unsubscribe();
+  }, [chatId]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -171,11 +177,40 @@ export default function ChatPage() {
     if (!newMessage.trim()) return;
     const messagesRef = collection(db, "chats", chatId, "messages");
     try {
+      // Get the other user's ID
+      const otherUserId = chatDetails.participants.find(
+        (id) => id !== user.uid
+      );
+
+      // Add the message
       await addDoc(messagesRef, {
         text: newMessage,
         senderId: user.uid,
         createdAt: serverTimestamp(),
+        seen: false,
+        seenAt: null,
       });
+
+      // Update the chat document with last message and timestamp
+      await updateDoc(doc(db, "chats", chatId), {
+        lastMessage: newMessage,
+        updatedAt: serverTimestamp(),
+        // Increment unread count for the other user
+        [`unreadCount.${otherUserId}`]:
+          (chatDetails.unreadCount?.[otherUserId] || 0) + 1,
+      });
+
+      // Create a notification for the other user
+      await addDoc(collection(db, "notifications"), {
+        userId: otherUserId,
+        title: "New Message",
+        message: `${user.displayName || "Someone"}: ${newMessage}`,
+        type: "chat",
+        chatId: chatId,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+
       setNewMessage("");
     } catch (error) {
       console.error("Error sending message:", error);
@@ -273,13 +308,28 @@ export default function ChatPage() {
               } rounded-2xl px-4 py-2 shadow-sm`}
             >
               <p className="break-words">{msg.text}</p>
-              <span
-                className={`text-xs ${
-                  msg.senderId === user.uid ? "text-white/70" : "text-gray-500"
-                } block mt-1`}
-              >
-                {formatTime(msg.createdAt)}
-              </span>
+              <div className="flex items-center justify-between mt-1">
+                <span
+                  className={`text-xs ${
+                    msg.senderId === user.uid
+                      ? "text-white/70"
+                      : "text-gray-500"
+                  } block`}
+                >
+                  {formatTime(msg.createdAt)}
+                </span>
+
+                {/* Read receipts - only show for sender's messages */}
+                {msg.senderId === user.uid && (
+                  <span className="ml-2">
+                    {msg.seen ? (
+                      <CheckCheck className="h-3.5 w-3.5 text-white/70" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5 text-white/70" />
+                    )}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -297,7 +347,7 @@ export default function ChatPage() {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none   focus:ring-[#8163e9] focus:border-transparent text-gray-900 bg-gray-50"
+            className="flex-1 p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#8163e9] focus:border-transparent text-gray-900 bg-gray-50"
             required
           />
           <button

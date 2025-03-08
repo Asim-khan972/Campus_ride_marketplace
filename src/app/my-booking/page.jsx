@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   MapPin,
@@ -26,6 +27,7 @@ import {
   Wind,
   DollarSign,
   Car,
+  ChevronLeft,
 } from "lucide-react";
 
 const statusColors = {
@@ -69,6 +71,7 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     if (!user) {
@@ -87,7 +90,7 @@ export default function MyBookingsPage() {
             const bookingData = { id: docSnap.id, ...docSnap.data() };
             try {
               const rideDoc = await getDoc(
-                doc(db, "rides", bookingData.rideId),
+                doc(db, "rides", bookingData.rideId)
               );
               if (rideDoc.exists()) {
                 return { ...bookingData, ride: rideDoc.data() };
@@ -98,11 +101,11 @@ export default function MyBookingsPage() {
               console.error(
                 "Error fetching ride for booking",
                 bookingData.id,
-                err,
+                err
               );
               return { ...bookingData, ride: null };
             }
-          }),
+          })
         );
         setBookings(fetchedBookings);
         setLoading(false);
@@ -111,7 +114,7 @@ export default function MyBookingsPage() {
         console.error("Error fetching bookings:", err);
         setError("Failed to load bookings. Please try again.");
         setLoading(false);
-      },
+      }
     );
 
     return () => unsubscribe();
@@ -162,16 +165,21 @@ export default function MyBookingsPage() {
     );
   }
 
+  const currentDate = new Date();
+  const previousBookings = bookings.filter(
+    (booking) =>
+      booking.ride &&
+      (["finished", "cancelled"].includes(booking.ride.status) ||
+        new Date(booking.ride.endDateTime) < currentDate)
+  );
+
   const currentBookings = bookings.filter(
     (booking) =>
       booking.ride &&
       ["not_started", "waiting_for_customer", "started"].includes(
-        booking.ride.status,
-      ),
-  );
-  const previousBookings = bookings.filter(
-    (booking) =>
-      booking.ride && ["finished", "cancelled"].includes(booking.ride.status),
+        booking.ride.status
+      ) &&
+      new Date(booking.ride.endDateTime) >= currentDate
   );
 
   const BookingCard = ({ booking, type }) => (
@@ -193,7 +201,7 @@ export default function MyBookingsPage() {
             <Calendar className="h-4 w-4 mr-1 text-black" />
             {booking.bookingTime
               ? new Date(
-                  booking.bookingTime.seconds * 1000,
+                  booking.bookingTime.seconds * 1000
                 ).toLocaleDateString()
               : "N/A"}
           </div>
@@ -291,6 +299,13 @@ export default function MyBookingsPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center text-gray-600"
+        >
+          <ChevronLeft className="h-5 w-5 mr-1" />
+          <span>Back</span>
+        </button>
         <h1 className="text-2xl sm:text-3xl font-bold text-black mb-8">
           My Bookings
         </h1>

@@ -7,23 +7,31 @@ import {
   onSnapshot,
   updateDoc,
   serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  getDoc,
+  addDoc,
 } from "firebase/firestore";
-import { useParams, useRouter, notFound } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 import {
   MapPin,
-  Calendar,
   Users,
   DollarSign,
   Car,
   Loader2,
   AlertCircle,
-  Clock,
   Wifi,
   Wind,
   ChevronLeft,
   CheckCircle2,
   AlertTriangle,
+  User,
+  CreditCard,
+  Bell,
 } from "lucide-react";
 
 const statusColors = {
@@ -50,10 +58,14 @@ export default function RideDetailsPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [ride, setRide] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [riders, setRiders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [newStatus, setNewStatus] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [totalSeatsBooked, setTotalSeatsBooked] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
 
   const statuses = [
     { value: "not_started", label: "Not Started" },
@@ -63,6 +75,7 @@ export default function RideDetailsPage() {
     { value: "cancelled", label: "Cancelled" },
   ];
 
+  // Fetch ride details
   useEffect(() => {
     if (!rideId) return;
     const rideRef = doc(db, "rides", rideId);
@@ -74,7 +87,7 @@ export default function RideDetailsPage() {
           setRide(rideData);
           setNewStatus(rideData.status || "not_started");
         } else {
-          notFound();
+          router.push("/404");
         }
         setLoading(false);
       },
@@ -85,7 +98,96 @@ export default function RideDetailsPage() {
       }
     );
     return () => unsubscribe();
-  }, [rideId]);
+  }, [rideId, router]);
+
+  // Fetch bookings for this ride
+  useEffect(() => {
+    if (!rideId) return;
+
+    const fetchBookings = async () => {
+      try {
+        const bookingsRef = collection(db, "bookings");
+        const q = query(bookingsRef, where("rideId", "==", rideId));
+        const querySnapshot = await getDocs(q);
+
+        const bookingsData = [];
+        let seats = 0;
+        let revenue = 0;
+
+        querySnapshot.forEach((doc) => {
+          const booking = { id: doc.id, ...doc.data() };
+          bookingsData.push(booking);
+
+          // Calculate total seats and revenue
+          if (booking.status === "active") {
+            seats += booking.seatsBooked || 0;
+            revenue += (booking.seatsBooked || 0) * (ride?.pricePerSeat || 0);
+          }
+        });
+
+        setBookings(bookingsData);
+        setTotalSeatsBooked(seats);
+        setTotalRevenue(revenue);
+
+        // Fetch rider details for each booking
+        const riderIds = bookingsData.map((booking) => booking.riderId);
+        const uniqueRiderIds = [...new Set(riderIds)];
+
+        const ridersData = await Promise.all(
+          uniqueRiderIds.map(async (riderId) => {
+            const userDoc = await getDoc(doc(db, "users", riderId));
+            if (userDoc.exists()) {
+              return { id: riderId, ...userDoc.data() };
+            }
+            return { id: riderId, fullName: "Unknown User" };
+          })
+        );
+
+        setRiders(ridersData);
+      } catch (err) {
+        console.error("Error fetching bookings:", err);
+        setError("Failed to load booking details.");
+      }
+    };
+
+    if (ride) {
+      fetchBookings();
+    }
+  }, [rideId, ride]);
+
+  // Send notification to all riders when status changes
+  const sendNotificationToRiders = async (newStatus) => {
+    try {
+      const statusMessage = {
+        not_started: "The ride is scheduled but not started yet.",
+        waiting_for_customer: "The driver is waiting for passengers.",
+        started: "The ride has started.",
+        finished: "The ride has been completed.",
+        cancelled: "The ride has been cancelled.",
+      };
+
+      // For each rider, create a notification
+      for (const booking of bookings) {
+        if (booking.riderId) {
+          if (booking.rideId === rideId && booking.status === "active") {
+            await addDoc(collection(db, "notifications"), {
+              userId: booking.riderId,
+              title: `Ride Status Updated: ${
+                newStatus.replace(/_/g, " ").charAt(0).toUpperCase() +
+                newStatus.slice(1).replace(/_/g, " ")
+              }`,
+              message: `Your ride from ${ride.pickupLocation} to ${ride.destinationLocation} has been updated. ${statusMessage[newStatus]}`,
+              read: false,
+              createdAt: serverTimestamp(),
+              rideId: rideId,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error sending notifications:", err);
+    }
+  };
 
   const handleStatusUpdate = async () => {
     if (!ride) return;
@@ -96,7 +198,12 @@ export default function RideDetailsPage() {
         status: newStatus,
         updatedAt: serverTimestamp(),
       });
+
+      // Send notifications to all riders about the status change
+      await sendNotificationToRiders(newStatus);
+
       setUpdating(false);
+      // router.push("/my-rides");
     } catch (err) {
       console.error("Error updating status:", err);
       setError("Failed to update status. Please try again.");
@@ -152,7 +259,7 @@ export default function RideDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -176,122 +283,214 @@ export default function RideDetailsPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {/* Main Details */}
-          <div className="p-6 space-y-6">
-            {/* Locations */}
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <MapPin className="h-5 w-5 text-[#8163e9] mt-1" />
-                <div>
-                  <p className="text-sm text-gray-500">Pickup Location</p>
-                  <p className="font-medium text-black">
-                    {ride.pickupLocation}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formatDateTime(ride.startDateTime)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <MapPin className="h-5 w-5 text-[#8163e9] mt-1" />
-                <div>
-                  <p className="text-sm text-gray-500">Destination</p>
-                  <p className="font-medium text-black">
-                    {ride.destinationLocation}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formatDateTime(ride.endDateTime)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Ride Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Users className="h-5 w-5 text-[#8163e9]" />
-                <div>
-                  <p className="text-sm text-gray-500">Available Seats</p>
-                  <p className="font-medium text-black">
-                    {ride.availableSeats}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <DollarSign className="h-5 w-5 text-[#8163e9]" />
-                <div>
-                  <p className="text-sm text-gray-500">Price per Seat</p>
-                  <p className="font-medium text-black">${ride.pricePerSeat}</p>
-                </div>
-              </div>
-              {ride.tollsIncluded && (
-                <div className="flex items-center space-x-3">
-                  <Car className="h-5 w-5 text-[#8163e9]" />
-                  <div>
-                    <p className="text-sm text-gray-500">Toll Price</p>
-                    <p className="font-medium text-black">${ride.tollPrice}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Ride Details */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {/* Main Details */}
+              <div className="p-6 space-y-6">
+                {/* Locations */}
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <MapPin className="h-5 w-5 text-[#8163e9] mt-1" />
+                    <div>
+                      <p className="text-sm text-gray-500">Pickup Location</p>
+                      <p className="font-medium text-black">
+                        {ride.pickupLocation}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {formatDateTime(ride.startDateTime)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <MapPin className="h-5 w-5 text-[#8163e9] mt-1" />
+                    <div>
+                      <p className="text-sm text-gray-500">Destination</p>
+                      <p className="font-medium text-black">
+                        {ride.destinationLocation}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {formatDateTime(ride.endDateTime)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Amenities */}
-            <div className="flex flex-wrap gap-4">
-              {ride.airConditioning && (
-                <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-full">
-                  <Wind className="h-4 w-4 text-[#8163e9]" />
-                  <span className="text-sm text-black">AC Available</span>
+                {/* Ride Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Users className="h-5 w-5 text-[#8163e9]" />
+                    <div>
+                      <p className="text-sm text-gray-500">Available Seats</p>
+                      <p className="font-medium text-black">
+                        {ride.availableSeats}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <DollarSign className="h-5 w-5 text-[#8163e9]" />
+                    <div>
+                      <p className="text-sm text-gray-500">Price per Seat</p>
+                      <p className="font-medium text-black">
+                        ${ride.pricePerSeat}
+                      </p>
+                    </div>
+                  </div>
+                  {ride.tollsIncluded && (
+                    <div className="flex items-center space-x-3">
+                      <Car className="h-5 w-5 text-[#8163e9]" />
+                      <div>
+                        <p className="text-sm text-gray-500">Toll Price</p>
+                        <p className="font-medium text-black">
+                          ${ride.tollPrice}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {ride.wifiAvailable && (
-                <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-full">
-                  <Wifi className="h-4 w-4 text-[#8163e9]" />
-                  <span className="text-sm text-black">WiFi Available</span>
+
+                {/* Amenities */}
+                <div className="flex flex-wrap gap-4">
+                  {ride.airConditioning && (
+                    <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-full">
+                      <Wind className="h-4 w-4 text-[#8163e9]" />
+                      <span className="text-sm text-black">AC Available</span>
+                    </div>
+                  )}
+                  {ride.wifiAvailable && (
+                    <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-full">
+                      <Wifi className="h-4 w-4 text-[#8163e9]" />
+                      <span className="text-sm text-black">WiFi Available</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Update Section (visible only to the driver) */}
+              {user && ride.ownerId === user.uid && (
+                <div className="border-t p-6 bg-gray-50">
+                  <h2 className="text-lg font-semibold text-black mb-4">
+                    Update Ride Status
+                  </h2>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
+                      <Bell className="h-4 w-4" />
+                      <span>
+                        All riders will be notified when you update the status
+                      </span>
+                    </div>
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors text-black bg-white"
+                    >
+                      {statuses.map((status) => (
+                        <option
+                          key={status.value}
+                          value={status.value}
+                          className="text-black"
+                        >
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleStatusUpdate}
+                      disabled={updating}
+                      className="w-full bg-[#8163e9] text-white py-3 px-4 rounded-lg hover:bg-[#8163e9]/90 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {updating ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 mr-2" />
+                          Update Status
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Status Update Section (visible only to the driver) */}
+          {/* Booking Summary (visible only to the driver) */}
           {user && ride.ownerId === user.uid && (
-            <div className="border-t p-6 bg-gray-50">
-              <h2 className="text-lg font-semibold text-black mb-4">
-                Update Ride Status
-              </h2>
-              <div className="space-y-4">
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors text-black bg-white"
-                >
-                  {statuses.map((status) => (
-                    <option
-                      key={status.value}
-                      value={status.value}
-                      className="text-black"
-                    >
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleStatusUpdate}
-                  disabled={updating}
-                  className="w-full bg-[#8163e9] text-white py-3 px-4 rounded-lg hover:bg-[#8163e9]/90 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {updating ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-5 w-5 mr-2" />
-                      Update Status
-                    </>
-                  )}
-                </button>
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6">
+                  <h2 className="text-lg font-semibold text-black mb-4">
+                    Booking Summary
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <Users className="h-5 w-5 text-[#8163e9] mr-2" />
+                        <span className="text-black">Seats Booked</span>
+                      </div>
+                      <span className="font-semibold text-black">
+                        {totalSeatsBooked}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <CreditCard className="h-5 w-5 text-[#8163e9] mr-2" />
+                        <span className="text-black">Total Revenue</span>
+                      </div>
+                      <span className="font-semibold text-black">
+                        ${totalRevenue}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <h3 className="text-md font-semibold text-black mb-3">
+                      Riders ({riders.length})
+                    </h3>
+
+                    {riders.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No riders yet</p>
+                    ) : (
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {riders.map((rider) => (
+                          <div
+                            key={rider.id}
+                            className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                              {rider.profilePicURL ? (
+                                <Image
+                                  src={
+                                    rider.profilePicURL || "/placeholder.svg"
+                                  }
+                                  alt={rider.fullName || "Rider"}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <User className="w-full h-full p-2 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-black truncate">
+                                {rider.fullName}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {rider.university || rider.location || ""}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

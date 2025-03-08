@@ -6,8 +6,6 @@ import {
   MapPin,
   Car,
   Search,
-  Wind,
-  Wifi,
   Users,
   Loader2,
   AlertCircle,
@@ -20,33 +18,30 @@ import {
   orderBy,
   getDoc,
   doc,
+  where,
 } from "firebase/firestore";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
+// Improved city extraction function
 const extractCity = (address) => {
   if (!address) return "";
+
+  // Split the address by commas and clean up whitespace
   const parts = address.split(",").map((part) => part.trim());
+
+  // Try to find a city part - usually the second-to-last or third-to-last part
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[parts.length - i];
+    // Skip parts that are likely postal codes or country names
+    if (part && isNaN(part) && part.length > 2) {
+      return part;
+    }
+  }
+
+  // Fallback to the original method
   return parts[parts.length > 2 ? parts.length - 2 : parts.length - 1];
-};
-
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371;
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) *
-      Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-const deg2rad = (deg) => {
-  return deg * (Math.PI / 180);
 };
 
 export default function Home() {
@@ -61,18 +56,59 @@ export default function Home() {
   const [filteredRides, setFilteredRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [userLocation, setUserLocation] = useState(null);
-  const [nearbyRides, setNearbyRides] = useState([]);
   const [profile, setProfile] = useState(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [suggestionsTO, setSuggestionsTO] = useState([]);
-  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
-  const [showToSuggestions, setShowToSuggestions] = useState(false);
+
+  // Autocomplete states
+  const [pickupSuggestions, setPickupSuggestions] = useState([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState([]);
+  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+  const [showDestinationSuggestions, setShowDestinationSuggestions] =
+    useState(false);
+  const [pickupCity, setPickupCity] = useState("");
+  const [destinationCity, setDestinationCity] = useState("");
+  const [disable, setDisable] = useState(false);
+
   const { user, loading: authLoading } = useAuth();
 
-  const fromSuggestionsRef = useRef(null);
-  const toSuggestionsRef = useRef(null);
+  const pickupSuggestionsRef = useRef(null);
+  const destinationSuggestionsRef = useRef(null);
 
+  // Modify the fetchPickupSuggestions function to also fetch rides when a location is selected
+  const fetchPickupSuggestions = async (input) => {
+    if (!input) return setPickupSuggestions([]);
+    try {
+      const response = await fetch(
+        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
+      );
+      const data = await response.json();
+      const suggestions = data.features.map((feature) => ({
+        formatted: feature.properties.formatted,
+        city: feature.properties.city || "",
+      }));
+      setPickupSuggestions(suggestions);
+      setShowPickupSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching pickup suggestions:", error);
+    }
+  };
+
+  // Add a new function to handle when a pickup location is selected
+  const handlePickupLocationSelected = (suggestion) => {
+    setSearchForm({
+      ...searchForm,
+      from: suggestion.formatted,
+    });
+    setPickupCity(suggestion.city);
+    setShowPickupSuggestions(false);
+
+    // Fetch rides for the selected location if it has a city
+    if (suggestion.formatted) {
+      const locationToUse = suggestion.formatted;
+      fetchRidesForLocation(locationToUse);
+    }
+  };
+
+  // Modify the fetchProfile function to not automatically call fetchRidesForLocation
   const fetchProfile = async () => {
     if (authLoading) return;
 
@@ -87,13 +123,15 @@ export default function Home() {
 
       if (userDoc.exists()) {
         const userProfile = { id: userDoc.id, ...userDoc.data() };
-
         setProfile(userProfile);
 
-        if (userProfile.location) {
-          fetchRidesForLocation(userProfile.location);
+        // Fetch rides from users at the same university
+        if (userProfile.university) {
+          fetchRidesFromSameUniversity(userProfile.university);
         } else {
-          console.log("User has no saved location.");
+          // Don't automatically fetch location-based rides
+          console.log("User has no university. Waiting for location input.");
+          setLoading(false);
         }
       } else {
         console.log("No profile found, redirecting to profile creation.");
@@ -102,7 +140,6 @@ export default function Home() {
     } catch (error) {
       console.error("Error fetching profile:", error);
       setError("Error loading profile data");
-    } finally {
       setLoading(false);
     }
   };
@@ -118,16 +155,16 @@ export default function Home() {
     // Add click outside listeners for suggestion dropdowns
     const handleClickOutside = (event) => {
       if (
-        fromSuggestionsRef.current &&
-        !fromSuggestionsRef.current.contains(event.target)
+        pickupSuggestionsRef.current &&
+        !pickupSuggestionsRef.current.contains(event.target)
       ) {
-        setShowFromSuggestions(false);
+        setShowPickupSuggestions(false);
       }
       if (
-        toSuggestionsRef.current &&
-        !toSuggestionsRef.current.contains(event.target)
+        destinationSuggestionsRef.current &&
+        !destinationSuggestionsRef.current.contains(event.target)
       ) {
-        setShowToSuggestions(false);
+        setShowDestinationSuggestions(false);
       }
     };
 
@@ -137,8 +174,73 @@ export default function Home() {
     };
   }, [authLoading, router]);
 
-  const fetchRidesForLocation = async (location) => {
+  // Fetch rides from users at the same university
+  const fetchRidesFromSameUniversity = async (university) => {
+    console.log("Fetching rides from users at", university);
     setLoading(true);
+
+    try {
+      // First, get all users from the same university
+      const usersRef = collection(db, "users");
+      const usersQuery = query(usersRef, where("university", "==", university));
+      const usersSnapshot = await getDocs(usersQuery);
+
+      // Extract user IDs
+      const userIds = [];
+      usersSnapshot.forEach((doc) => {
+        if (doc.id !== user?.uid) {
+          // Exclude current user
+          userIds.push(doc.id);
+        }
+      });
+
+      console.log(`Found ${userIds.length} users from ${university}`);
+
+      if (userIds.length === 0) {
+        setRides([]);
+        setFilteredRides([]);
+        setLoading(false);
+        return;
+      }
+
+      // Now fetch rides from these users
+      const ridesRef = collection(db, "rides");
+      const currentDate = new Date();
+
+      // Get all rides
+      const q = query(ridesRef, orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      const fetchedRides = [];
+
+      querySnapshot.forEach((doc) => {
+        const ride = { id: doc.id, ...doc.data() };
+
+        if (userIds.includes(ride.ownerId)) {
+          const rideStartDate = new Date(ride.startDateTime);
+          if (ride.status === "not_started" && rideStartDate > currentDate) {
+            fetchedRides.push(ride);
+          }
+        }
+      });
+
+      console.log(
+        `Found ${fetchedRides.length} valid rides from university peers`
+      );
+      setRides(fetchedRides);
+      setFilteredRides(fetchedRides);
+    } catch (err) {
+      console.error("Error fetching university rides:", err);
+      setError("Failed to fetch rides. Please try again.");
+    }
+
+    setLoading(false);
+  };
+
+  const fetchRidesForLocation = async (location) => {
+    console.log("Fetching rides for location:", location);
+    setLoading(true);
+
     try {
       const ridesRef = collection(db, "rides");
       const q = query(ridesRef, orderBy("createdAt", "desc"));
@@ -146,15 +248,22 @@ export default function Home() {
 
       const fetchedRides = [];
       const cityName = extractCity(location).toLowerCase();
+      const currentDate = new Date();
 
       querySnapshot.forEach((doc) => {
         const ride = { id: doc.id, ...doc.data() };
+
         // Only include rides not created by the current user
         if (ride.ownerId !== user?.uid) {
           const rideFromCity = extractCity(ride.pickupLocation).toLowerCase();
+          const rideStartDate = new Date(ride.startDateTime);
+
+          // Check if ride is from the same city, hasn't started, and hasn't expired
           if (
-            rideFromCity.includes(cityName) ||
-            cityName.includes(rideFromCity)
+            (rideFromCity.includes(cityName) ||
+              cityName.includes(rideFromCity)) &&
+            ride.status === "not_started" &&
+            rideStartDate > currentDate
           ) {
             fetchedRides.push(ride);
           }
@@ -167,28 +276,29 @@ export default function Home() {
       console.error("Error fetching rides:", err);
       setError("Failed to fetch rides. Please try again.");
     }
+
     setLoading(false);
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
 
-    if (searchForm.from === "" || searchForm.to === "") {
-      setError("Pickup and Destination cannot be empty");
+    if (searchForm.from === "") {
+      setDisable(true);
+      return;
+    }
+    if (searchForm.to === "") {
+      setDisable(true);
       return;
     }
 
-    if (searchForm.from === searchForm.to) {
-      setError("Pickup and destination locations cannot be the same.");
-      return;
-    }
-
-    // Create query parameters for the search page
     const queryParams = new URLSearchParams({
       from: searchForm.from,
       to: searchForm.to,
       date: searchForm.date || "",
       passengers: searchForm.passengers || 1,
+      pickupCity: pickupCity,
+      destinationCity: destinationCity,
     }).toString();
 
     // Redirect to search page with query parameters
@@ -206,35 +316,21 @@ export default function Home() {
     });
   };
 
-  const fetchSuggestions = async (input) => {
-    if (!input) return setSuggestions([]);
+  const fetchDestinationSuggestions = async (input) => {
+    if (!input) return setDestinationSuggestions([]);
     try {
       const response = await fetch(
         `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
       );
       const data = await response.json();
-      setSuggestions(
-        data.features.map((feature) => feature.properties.formatted)
-      );
-      setShowFromSuggestions(true);
+      const suggestions = data.features.map((feature) => ({
+        formatted: feature.properties.formatted,
+        city: feature.properties.city || "",
+      }));
+      setDestinationSuggestions(suggestions);
+      setShowDestinationSuggestions(true);
     } catch (error) {
-      console.error("Error fetching autocomplete suggestions:", error);
-    }
-  };
-
-  const fetchSuggestionsTO = async (input) => {
-    if (!input) return setSuggestionsTO([]);
-    try {
-      const response = await fetch(
-        `https://api.geoapify.com/v1/geocode/autocomplete?text=${input}&apiKey=a2564e175403446795b3090484ca787e`
-      );
-      const data = await response.json();
-      setSuggestionsTO(
-        data.features.map((feature) => feature.properties.formatted)
-      );
-      setShowToSuggestions(true);
-    } catch (error) {
-      console.error("Error fetching autocomplete suggestions:", error);
+      console.error("Error fetching destination suggestions:", error);
     }
   };
 
@@ -257,7 +353,8 @@ export default function Home() {
               className="space-y-5 bg-white/10 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-lg"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative" ref={fromSuggestionsRef}>
+                {/* Pickup Location with Autocomplete */}
+                <div className="relative" ref={pickupSuggestionsRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70">
                     <MapPin className="h-5 w-5" />
                   </div>
@@ -267,33 +364,35 @@ export default function Home() {
                     value={searchForm.from}
                     onChange={(e) => {
                       setSearchForm({ ...searchForm, from: e.target.value });
-                      fetchSuggestions(e.target.value);
+                      fetchPickupSuggestions(e.target.value);
                     }}
-                    className="w-full pl-10 pr-3 py-3.5 rounded-lg border-0  focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
+                    className="w-full pl-10 pr-3 py-3.5 rounded-lg border-0 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
 
-                  {showFromSuggestions && suggestions.length > 0 && (
+                  {showPickupSuggestions && pickupSuggestions.length > 0 && (
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {suggestions.map((suggestion, index) => (
+                      {pickupSuggestions.map((suggestion, index) => (
                         <li
                           key={index}
-                          onClick={() => {
-                            setSearchForm({
-                              ...searchForm,
-                              from: suggestion,
-                            });
-                            setShowFromSuggestions(false);
-                            setSuggestions([]);
-                          }}
+                          onClick={() =>
+                            handlePickupLocationSelected(suggestion)
+                          }
                           className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
                         >
-                          {suggestion}
+                          {suggestion.formatted}
+                          {suggestion.city && (
+                            <span className="block text-xs text-gray-500 mt-1">
+                              City: {suggestion.city}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
-                <div className="relative" ref={toSuggestionsRef}>
+
+                {/* Destination Location with Autocomplete */}
+                <div className="relative" ref={destinationSuggestionsRef}>
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70">
                     <MapPin className="h-5 w-5" />
                   </div>
@@ -303,27 +402,36 @@ export default function Home() {
                     value={searchForm.to}
                     onChange={(e) => {
                       setSearchForm({ ...searchForm, to: e.target.value });
-                      fetchSuggestionsTO(e.target.value);
+                      fetchDestinationSuggestions(e.target.value);
                     }}
-                    className="w-full pl-10 pr-3 py-3.5 rounded-lg border-0  focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
+                    className="w-full pl-10 pr-3 py-3.5 rounded-lg border-0 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
-                  {showToSuggestions && suggestionsTO.length > 0 && (
-                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {suggestionsTO.map((suggestion, index) => (
-                        <li
-                          key={index}
-                          onClick={() => {
-                            setSearchForm({ ...searchForm, to: suggestion });
-                            setShowToSuggestions(false);
-                            setSuggestionsTO([]);
-                          }}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
-                        >
-                          {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  {showDestinationSuggestions &&
+                    destinationSuggestions.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {destinationSuggestions.map((suggestion, index) => (
+                          <li
+                            key={index}
+                            onClick={() => {
+                              setSearchForm({
+                                ...searchForm,
+                                to: suggestion.formatted,
+                              });
+                              setDestinationCity(suggestion.city);
+                              setShowDestinationSuggestions(false);
+                            }}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 text-sm"
+                          >
+                            {suggestion.formatted}
+                            {suggestion.city && (
+                              <span className="block text-xs text-gray-500 mt-1">
+                                City: {suggestion.city}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                 </div>
               </div>
               <div className="flex gap-4">
@@ -373,9 +481,7 @@ export default function Home() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {searchForm.from && searchForm.to
-                    ? "Search Results"
-                    : "Available Rides"}
+                  {profile?.university ? `Rides Near by` : "Available Rides"}
                 </h2>
                 <span className="text-sm bg-[#8163e9]/10 text-[#8163e9] px-3 py-1 rounded-full font-medium">
                   {filteredRides.length}{" "}
@@ -390,14 +496,14 @@ export default function Home() {
                     No rides found
                   </h3>
                   <p className="text-gray-500 max-w-md mx-auto mb-6">
-                    We couldn't find any rides matching your criteria. Try
-                    searching for a different route or check back later.
+                    We couldn't find any rides from your university peers. Try
+                    searching for a specific route or check back later.
                   </p>
                 </div>
               ) : (
                 <div className="grid gap-5">
                   {filteredRides.map((ride) => (
-                    <Link key={ride.id} href={`/rides/${ride.id}`}>
+                    <Link key={ride.id} href={`/home/rides/${ride.id}`}>
                       <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 hover:border-[#8163e9] hover:shadow-lg transition-all duration-200">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-5 gap-4">
                           <div className="space-y-3">
@@ -447,18 +553,6 @@ export default function Home() {
                             <Users className="h-4 w-4 text-[#8163e9]" />
                             <span>{ride.availableSeats} seats left</span>
                           </div>
-                          {ride.airConditioning && (
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
-                              <Wind className="h-4 w-4 text-[#8163e9]" />
-                              <span>AC</span>
-                            </div>
-                          )}
-                          {ride.wifiAvailable && (
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full">
-                              <Wifi className="h-4 w-4 text-[#8163e9]" />
-                              <span>WiFi</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </Link>

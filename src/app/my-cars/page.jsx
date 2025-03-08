@@ -22,10 +22,13 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle2,
+  ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const MyCars = () => {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,8 +126,14 @@ const MyCars = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-[#8163e9] rounded-2xl mb-8 py-6 px-4 sm:px-6 flex items-center justify-between">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center">
+        <div className="bg-[#8163e9] rounded-2xl mb-8 py-6 px-4 sm:px-6 flex items-center justify-between relative">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-gray-50 rounded-full transition-colors absolute left-4"
+          >
+            <ChevronLeft className="h-6 w-6 text-white" />
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center ml-12">
             <Car className="w-6 h-6 mr-2" />
             My Cars
           </h1>

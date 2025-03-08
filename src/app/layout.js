@@ -1,6 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+
 import AppWrapper from "@/components/AppWrapper";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -28,9 +30,11 @@ export default function RootLayout({ children }) {
       >
         <AuthProvider>
           <AppWrapper>
-            <Navbar />
-            {children}
-            <Footer />
+            <NotificationProvider>
+              <Navbar />
+              {children}
+              <Footer />
+            </NotificationProvider>
           </AppWrapper>
         </AuthProvider>
       </body>

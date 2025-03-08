@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import {
@@ -10,11 +17,11 @@ import {
   Users,
   Calendar,
   MessageSquare,
-  Settings,
   PlusCircle,
   Loader2,
   AlertCircle,
-  TrendingUp,
+  DollarSign,
+  BarChart3,
 } from "lucide-react";
 
 export default function OwnerDashboard() {
@@ -23,27 +30,91 @@ export default function OwnerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Dashboard metrics
+  const [metrics, setMetrics] = useState({
+    cars: 0,
+    rides: 0,
+    bookings: 0,
+    totalRevenue: 0,
+  });
+
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchUserData = async () => {
       if (!user) {
         setLoading(false);
         return;
       }
 
       try {
+        // Fetch user profile
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           setProfile({ id: userDoc.id, ...userDoc.data() });
         }
+
+        // Fetch cars count
+        const carsRef = collection(db, "cars");
+        const carsQuery = query(carsRef, where("ownerId", "==", user.uid));
+        const carsSnapshot = await getDocs(carsQuery);
+        const carsCount = carsSnapshot.size;
+
+        // Fetch rides
+        const ridesRef = collection(db, "rides");
+        const ridesQuery = query(ridesRef, where("ownerId", "==", user.uid));
+        const ridesSnapshot = await getDocs(ridesQuery);
+        const ridesCount = ridesSnapshot.size;
+
+        // Calculate revenue and get ride IDs for booking query
+        let totalRevenue = 0;
+        const rideIds = [];
+
+        ridesSnapshot.forEach((doc) => {
+          const ride = doc.data();
+          rideIds.push(doc.id);
+          console.log("this is rides", ride);
+          // Calculate potential revenue (price per seat * total seats)
+          const totalSeats = ride.totalSeats || 0;
+          const availableSeats = ride.availableSeats || 0;
+          const bookedSeats = totalSeats - availableSeats;
+
+          if (bookedSeats > 0 && ride.pricePerSeat) {
+            totalRevenue += bookedSeats * ride.pricePerSeat;
+          }
+        });
+
+        // Fetch bookings for user's rides
+        let bookingsCount = 0;
+        if (rideIds.length > 0) {
+          const bookingsRef = collection(db, "bookings");
+          const bookingsPromises = rideIds.map((rideId) => {
+            const q = query(bookingsRef, where("rideId", "==", rideId));
+            return getDocs(q);
+          });
+
+          const bookingsSnapshots = await Promise.all(bookingsPromises);
+          bookingsCount = bookingsSnapshots.reduce(
+            (total, snapshot) => total + snapshot.size,
+            0
+          );
+        }
+
+        // Update metrics
+        setMetrics({
+          cars: carsCount,
+          rides: ridesCount,
+          bookings: bookingsCount,
+          totalRevenue: totalRevenue,
+        });
+
         setLoading(false);
       } catch (err) {
-        console.error("Error fetching user profile:", err);
-        setError("Failed to load user profile");
+        console.error("Error fetching dashboard data:", err);
+        setError("Failed to load dashboard data");
         setLoading(false);
       }
     };
 
-    fetchUserProfile();
+    fetchUserData();
   }, [user]);
 
   if (authLoading || loading) {
@@ -66,7 +137,7 @@ export default function OwnerDashboard() {
             Authentication Required
           </h2>
           <p className="text-gray-600 mb-6">
-            Please log in as an owner to view your dashboard.
+            Please log in to view your dashboard.
           </p>
           <Link
             href="/login"
@@ -103,7 +174,7 @@ export default function OwnerDashboard() {
       title: "My Rides",
       description: "Manage your published rides",
       icon: Car,
-      href: "/driver/dashboard",
+      href: "/my-rides",
       color: "bg-blue-100",
       iconColor: "text-blue-600",
     },
@@ -127,25 +198,9 @@ export default function OwnerDashboard() {
       title: "Messages",
       description: "View your conversations",
       icon: MessageSquare,
-      href: "/chats",
+      href: "/owner/chats",
       color: "bg-purple-100",
       iconColor: "text-purple-600",
-    },
-    {
-      title: "Calendar",
-      description: "View your upcoming rides",
-      icon: Calendar,
-      href: "/calendar",
-      color: "bg-indigo-100",
-      iconColor: "text-indigo-600",
-    },
-    {
-      title: "Settings",
-      description: "Update your preferences",
-      icon: Settings,
-      href: "/settings",
-      color: "bg-gray-100",
-      iconColor: "text-gray-600",
     },
   ];
 
@@ -157,10 +212,10 @@ export default function OwnerDashboard() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                Welcome, {profile?.fullName || user.email || "Owner"}
+                Welcome, {profile?.fullName || user.email || "Driver"}
               </h1>
               <p className="text-white/80">
-                Manage your rides and track your driver activity
+                Here's an overview of your ride-sharing activity
               </p>
             </div>
             <div className="flex flex-wrap gap-4">
@@ -176,77 +231,80 @@ export default function OwnerDashboard() {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-gray-500 text-sm font-medium">My Cars</h3>
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <Car className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{metrics.cars}</p>
+            <Link
+              href="/my-cars"
+              className="text-sm text-[#8163e9] hover:underline mt-2 inline-block"
+            >
+              Manage cars
+            </Link>
+          </div>
+
           <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-gray-500 text-sm font-medium">
                 Active Rides
               </h3>
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <Car className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">3</p>
-            <p className="text-sm text-green-600 flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 mr-1" />
-              <span>Up 10% from last week</span>
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-gray-500 text-sm font-medium">
-                Total Passengers
-              </h3>
               <div className="bg-green-100 p-2 rounded-lg">
-                <Users className="h-5 w-5 text-green-600" />
+                <Calendar className="h-5 w-5 text-green-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900">24</p>
-            <p className="text-sm text-green-600 flex items-center mt-2">
-              <TrendingUp className="h-4 w-4 mr-1" />
-              <span>Up 24% from last month</span>
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-gray-500 text-sm font-medium">
-                Upcoming Rides
-              </h3>
-              <div className="bg-purple-100 p-2 rounded-lg">
-                <Calendar className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">5</p>
-            <p className="text-sm text-gray-500 mt-2">Next ride in 2 days</p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-gray-500 text-sm font-medium">
-                Unread Messages
-              </h3>
-              <div className="bg-yellow-100 p-2 rounded-lg">
-                <MessageSquare className="h-5 w-5 text-yellow-600" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">7</p>
+            <p className="text-2xl font-bold text-gray-900">{metrics.rides}</p>
             <Link
-              href="/chats"
+              href="/my-rides"
               className="text-sm text-[#8163e9] hover:underline mt-2 inline-block"
             >
-              View messages
+              View rides
             </Link>
           </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-gray-500 text-sm font-medium">
+                Total Bookings
+              </h3>
+              <div className="bg-purple-100 p-2 rounded-lg">
+                <Users className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {metrics.bookings}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">From all your rides</p>
+          </div>
+
+          {/* <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-gray-500 text-sm font-medium">
+                Total Revenue
+              </h3>
+              <div className="bg-yellow-100 p-2 rounded-lg">
+                <DollarSign className="h-5 w-5 text-yellow-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              ${metrics.totalRevenue.toFixed(2)}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Earnings from all rides
+            </p>
+          </div> */}
         </div>
 
         {/* Quick Actions */}
         <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {actionCards.map((card) => (
             <Link key={card.title} href={card.href} className="block group">
-              <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100 hover:border-[#8163e9] hover:shadow-lg transition-all duration-200">
+              <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100 hover:border-[#8163e9] hover:shadow-lg transition-all duration-200 h-full">
                 <div className="flex items-start gap-4">
                   <div className={`${card.color} p-3 rounded-lg`}>
                     <card.icon className={`h-6 w-6 ${card.iconColor}`} />
@@ -263,53 +321,85 @@ export default function OwnerDashboard() {
           ))}
         </div>
 
-        {/* Recent Activity */}
+        {/* Performance Overview */}
         <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Recent Activity</h2>
-            <Link
-              href="/activity"
-              className="text-sm text-[#8163e9] hover:underline"
-            >
-              View all
-            </Link>
+            <h2 className="text-xl font-bold text-gray-900">
+              Performance Overview
+            </h2>
+            <div className="bg-gray-100 p-2 rounded-lg">
+              <BarChart3 className="h-5 w-5 text-gray-600" />
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="bg-blue-100 p-2 rounded-full">
-                <Car className="h-5 w-5 text-blue-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Booking Rate</span>
+                <span className="text-gray-900 font-medium">
+                  {metrics.rides > 0
+                    ? Math.round((metrics.bookings / metrics.rides) * 100)
+                    : 0}
+                  %
+                </span>
               </div>
-              <div>
-                <p className="font-medium text-gray-900">New ride published</p>
-                <p className="text-sm text-gray-500">New York to Boston</p>
-                <p className="text-xs text-gray-400 mt-1">2 hours ago</p>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="bg-[#8163e9] h-2.5 rounded-full"
+                  style={{
+                    width: `${
+                      metrics.rides > 0
+                        ? Math.round((metrics.bookings / metrics.rides) * 100)
+                        : 0
+                    }%`,
+                  }}
+                ></div>
+              </div>
+
+              <div className="flex justify-between items-center mt-4">
+                <span className="text-gray-600">Average Revenue per Ride</span>
+                <span className="text-gray-900 font-medium">
+                  $
+                  {metrics.rides > 0
+                    ? (metrics.totalRevenue / metrics.rides).toFixed(2)
+                    : "0.00"}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="bg-green-100 p-2 rounded-full">
-                <Users className="h-5 w-5 text-green-600" />
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Cars Utilization</span>
+                <span className="text-gray-900 font-medium">
+                  {metrics.cars > 0
+                    ? Math.round((metrics.rides / metrics.cars) * 100)
+                    : 0}
+                  %
+                </span>
               </div>
-              <div>
-                <p className="font-medium text-gray-900">
-                  New passenger booking
-                </p>
-                <p className="text-sm text-gray-500">John D. booked 2 seats</p>
-                <p className="text-xs text-gray-400 mt-1">Yesterday</p>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="bg-green-500 h-2.5 rounded-full"
+                  style={{
+                    width: `${
+                      metrics.cars > 0
+                        ? Math.min(
+                            100,
+                            Math.round((metrics.rides / metrics.cars) * 100)
+                          )
+                        : 0
+                    }%`,
+                  }}
+                ></div>
               </div>
-            </div>
 
-            <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="bg-purple-100 p-2 rounded-full">
-                <MessageSquare className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">
-                  New message received
-                </p>
-                <p className="text-sm text-gray-500">From: Sarah M.</p>
-                <p className="text-xs text-gray-400 mt-1">2 days ago</p>
+              <div className="flex justify-between items-center mt-4">
+                <span className="text-gray-600">Average Bookings per Ride</span>
+                <span className="text-gray-900 font-medium">
+                  {metrics.rides > 0
+                    ? (metrics.bookings / metrics.rides).toFixed(1)
+                    : "0.0"}
+                </span>
               </div>
             </div>
           </div>

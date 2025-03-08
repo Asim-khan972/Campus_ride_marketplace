@@ -5,7 +5,7 @@ import { auth, db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { Loader2, Upload, X, Car } from "lucide-react";
+import { Loader2, Upload, X, Car, ArrowLeft } from "lucide-react";
 
 const CarForm = () => {
   const router = useRouter();
@@ -79,6 +79,9 @@ const CarForm = () => {
       setCarNumber("");
       setMaxCapacity("");
       setImages([null, null, null, null, null]);
+      setTimeout(() => {
+        router.push("/my-cars");
+      }, 500);
     } catch (error) {
       console.error("Error adding car:", error);
       setMessage("Error adding car. Please try again.");
@@ -90,7 +93,14 @@ const CarForm = () => {
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
-          <div className="bg-[#8163e9] py-6">
+          <div className="bg-[#8163e9] py-6 relative">
+            <button
+              onClick={() => router.back()}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-200 transition-colors flex items-center justify-center bg-[#6f51d9] p-2 rounded-full"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
             <h2 className="text-2xl md:text-3xl font-bold text-white text-center flex items-center justify-center">
               <Car className="w-6 h-6 mr-2" />
               Add a New Car
@@ -195,6 +205,7 @@ const CarForm = () => {
                             <img
                               src={
                                 URL.createObjectURL(images[0]) ||
+                                "/placeholder.svg" ||
                                 "/placeholder.svg"
                               }
                               alt="Car preview"
@@ -245,6 +256,7 @@ const CarForm = () => {
                               <img
                                 src={
                                   URL.createObjectURL(images[idx]) ||
+                                  "/placeholder.svg" ||
                                   "/placeholder.svg"
                                 }
                                 alt={`Car preview ${idx + 1}`}
