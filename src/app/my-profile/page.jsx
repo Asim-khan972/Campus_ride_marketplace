@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  getDoc,
+  getFirestore,
+  writeBatch,
+  doc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -77,7 +86,6 @@ const MyProfile = () => {
     }
   };
 
-  // Add handleDeleteAccount function
   const handleDeleteAccount = async () => {
     if (!user) return;
 
@@ -86,43 +94,39 @@ const MyProfile = () => {
 
     try {
       const userId = user.uid;
-      const batch = db.batch();
+      const batch = writeBatch(db); // ✅ Use writeBatch(db) instead of db.batch()
 
       // 1. Delete user's bookings
-      const bookingsSnapshot = await db
-        .collection("bookings")
-        .where("riderId", "==", userId)
-        .get();
-      bookingsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      const bookingsQuery = query(
+        collection(db, "bookings"),
+        where("riderId", "==", userId)
+      );
+      const bookingsSnapshot = await getDocs(bookingsQuery);
+      bookingsSnapshot.forEach((doc) => batch.delete(doc.ref));
 
       // 2. Delete user's cars
-      const carsSnapshot = await db
-        .collection("cars")
-        .where("ownerId", "==", userId)
-        .get();
-      carsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      const carsQuery = query(
+        collection(db, "cars"),
+        where("ownerId", "==", userId)
+      );
+      const carsSnapshot = await getDocs(carsQuery);
+      carsSnapshot.forEach((doc) => batch.delete(doc.ref));
 
       // 3. Delete user's rides
-      const ridesSnapshot = await db
-        .collection("rides")
-        .where("ownerId", "==", userId)
-        .get();
-      ridesSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      const ridesQuery = query(
+        collection(db, "rides"),
+        where("ownerId", "==", userId)
+      );
+      const ridesSnapshot = await getDocs(ridesQuery);
+      ridesSnapshot.forEach((doc) => batch.delete(doc.ref));
 
       // 4. Delete user's chats
-      const chatsSnapshot = await db
-        .collection("chats")
-        .where("participants", "array-contains", userId)
-        .get();
-      chatsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      const chatsQuery = query(
+        collection(db, "chats"),
+        where("participants", "array-contains", userId)
+      );
+      const chatsSnapshot = await getDocs(chatsQuery);
+      chatsSnapshot.forEach((doc) => batch.delete(doc.ref));
 
       // 5. Delete user document
       batch.delete(doc(db, "users", userId));

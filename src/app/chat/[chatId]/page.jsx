@@ -41,7 +41,9 @@ export default function ChatPage() {
   const [isUserActive, setIsUserActive] = useState(true);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+    }
   };
 
   // Fetch chat and user details
@@ -169,8 +171,21 @@ export default function ChatPage() {
 
   // Scroll to bottom when messages update
   useEffect(() => {
-    scrollToBottom();
+    // Use a small timeout to ensure DOM has updated
+    const timer = setTimeout(() => {
+      scrollToBottom();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [messages]);
+
+  // Add this new useEffect to handle initial load scrolling
+  useEffect(() => {
+    // Scroll to bottom when chat first loads
+    if (messages.length > 0 && !loading) {
+      scrollToBottom();
+    }
+  }, [loading, messages.length]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -194,17 +209,34 @@ export default function ChatPage() {
       // Update the chat document with last message and timestamp
       await updateDoc(doc(db, "chats", chatId), {
         lastMessage: newMessage,
+        lastMessageSenderId: user.uid, // Add this to track who sent the last message
+        lastMessageSeen: false, // Add this to track if the last message was seen
         updatedAt: serverTimestamp(),
         // Increment unread count for the other user
         [`unreadCount.${otherUserId}`]:
           (chatDetails.unreadCount?.[otherUserId] || 0) + 1,
       });
 
+      // Get sender's name for the notification
+      let senderName = "Someone";
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists() && userDoc.data().fullName) {
+          senderName = userDoc.data().fullName;
+        }
+      } catch (error) {
+        console.error("Error getting sender name:", error);
+      }
+
       // Create a notification for the other user
       await addDoc(collection(db, "notifications"), {
         userId: otherUserId,
         title: "New Message",
-        message: `${user.displayName || "Someone"}: ${newMessage}`,
+        message: `${senderName}: ${
+          newMessage.length > 30
+            ? newMessage.substring(0, 30) + "..."
+            : newMessage
+        }`,
         type: "chat",
         chatId: chatId,
         read: false,
@@ -292,7 +324,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -333,7 +365,7 @@ export default function ChatPage() {
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-[1px]" />
       </div>
 
       {/* Message Input */}

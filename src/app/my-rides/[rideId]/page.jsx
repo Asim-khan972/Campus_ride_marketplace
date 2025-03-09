@@ -24,14 +24,13 @@ import {
   Car,
   Loader2,
   AlertCircle,
-  Wifi,
-  Wind,
   ChevronLeft,
   CheckCircle2,
   AlertTriangle,
   User,
   CreditCard,
   Bell,
+  MessageSquare,
 } from "lucide-react";
 
 const statusColors = {
@@ -66,6 +65,7 @@ export default function RideDetailsPage() {
   const [updating, setUpdating] = useState(false);
   const [totalSeatsBooked, setTotalSeatsBooked] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [chatLoading, setChatLoading] = useState({});
 
   const statuses = [
     { value: "not_started", label: "Not Started" },
@@ -211,6 +211,68 @@ export default function RideDetailsPage() {
     }
   };
 
+  // Function to create or get existing chat with a rider
+  const handleChatWithRider = async (riderId) => {
+    if (!user || !riderId) return;
+
+    // Set loading state for this specific rider
+    setChatLoading((prev) => ({ ...prev, [riderId]: true }));
+
+    try {
+      // Check if a chat already exists between owner and rider
+      const chatsRef = collection(db, "chats");
+      const q = query(
+        chatsRef,
+        where("participants", "array-contains", user.uid)
+      );
+      const querySnapshot = await getDocs(q);
+
+      let existingChatId = null;
+
+      // Look through all chats to find one with this rider
+      querySnapshot.forEach((doc) => {
+        const chatData = doc.data();
+        if (chatData.participants.includes(riderId)) {
+          existingChatId = doc.id;
+        }
+      });
+
+      // If chat exists, navigate to it
+      if (existingChatId) {
+        router.push(`/chat/${existingChatId}`);
+        return;
+      }
+
+      // If no chat exists, create a new one
+      const newChatRef = await addDoc(chatsRef, {
+        participants: [user.uid, riderId],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastMessage: "",
+        unreadCount: {
+          [user.uid]: 0,
+          [riderId]: 0,
+        },
+      });
+
+      // Add a system message to the new chat
+      const messagesRef = collection(db, "chats", newChatRef.id, "messages");
+      await addDoc(messagesRef, {
+        text: `Chat started for ride from ${ride.pickupLocation} to ${ride.destinationLocation}`,
+        senderId: "system",
+        createdAt: serverTimestamp(),
+        seen: false,
+      });
+
+      // Navigate to the new chat
+      router.push(`/chat/${newChatRef.id}`);
+    } catch (error) {
+      console.error("Error creating or finding chat:", error);
+    } finally {
+      setChatLoading((prev) => ({ ...prev, [riderId]: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -349,22 +411,6 @@ export default function RideDetailsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Amenities */}
-                <div className="flex flex-wrap gap-4">
-                  {ride.airConditioning && (
-                    <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-full">
-                      <Wind className="h-4 w-4 text-[#8163e9]" />
-                      <span className="text-sm text-black">AC Available</span>
-                    </div>
-                  )}
-                  {ride.wifiAvailable && (
-                    <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-full">
-                      <Wifi className="h-4 w-4 text-[#8163e9]" />
-                      <span className="text-sm text-black">WiFi Available</span>
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Status Update Section (visible only to the driver) */}
@@ -461,30 +507,46 @@ export default function RideDetailsPage() {
                         {riders.map((rider) => (
                           <div
                             key={rider.id}
-                            className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                           >
-                            <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                              {rider.profilePicURL ? (
-                                <Image
-                                  src={
-                                    rider.profilePicURL || "/placeholder.svg"
-                                  }
-                                  alt={rider.fullName || "Rider"}
-                                  fill
-                                  className="object-cover"
-                                />
+                            <div className="flex items-center space-x-3">
+                              <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                                {rider.profilePicURL ? (
+                                  <Image
+                                    src={
+                                      rider.profilePicURL || "/placeholder.svg"
+                                    }
+                                    alt={rider.fullName || "Rider"}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <User className="w-full h-full p-2 text-gray-400" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-black truncate">
+                                  {rider.fullName}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {rider.university || rider.location || ""}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Chat button */}
+                            <button
+                              onClick={() => handleChatWithRider(rider.id)}
+                              disabled={chatLoading[rider.id]}
+                              className="ml-2 p-2 bg-[#8163e9] text-white rounded-full hover:bg-[#8163e9]/90 transition-colors"
+                              title="Chat with rider"
+                            >
+                              {chatLoading[rider.id] ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
-                                <User className="w-full h-full p-2 text-gray-400" />
+                                <MessageSquare className="h-4 w-4" />
                               )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-black truncate">
-                                {rider.fullName}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate">
-                                {rider.university || rider.location || ""}
-                              </p>
-                            </div>
+                            </button>
                           </div>
                         ))}
                       </div>

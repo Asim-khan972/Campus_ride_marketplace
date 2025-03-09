@@ -9,6 +9,7 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  getDocs,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -19,13 +20,10 @@ import {
   ChevronRight,
   UserCircle,
   CheckCheck,
-  ChevronLeft,
 } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 export default function OwnerChatInbox() {
-  const router = useRouter();
   const { user } = useAuth();
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,9 +45,10 @@ export default function OwnerChatInbox() {
           ...doc.data(),
         }));
 
-        // Fetch user details for all participants
+        // Fetch user details and unread message counts for all chats
         const chatsWithUsers = await Promise.all(
           fetchedChats.map(async (chat) => {
+            // Fetch user details for all participants
             const userDetails = await Promise.all(
               chat.participants.map(async (participantId) => {
                 const userDoc = await getDoc(doc(db, "users", participantId));
@@ -70,8 +69,32 @@ export default function OwnerChatInbox() {
             const otherUser =
               userDetails.find((u) => u.id !== user.uid) || null;
 
-            // Get unread count for current user
-            const unreadCount = chat.unreadCount?.[user.uid] || 0;
+            // Get unread count for current user from the chat document
+            let unreadCount = chat.unreadCount?.[user.uid] || 0;
+
+            // If we need to verify the unread count by actually counting unread messages:
+            if (chat.id) {
+              try {
+                // Get all unread messages in this chat
+                const messagesRef = collection(
+                  db,
+                  "chats",
+                  chat.id,
+                  "messages"
+                );
+                const messagesQuery = query(
+                  messagesRef,
+                  where("senderId", "!=", user.uid),
+                  where("seen", "==", false)
+                );
+                const unreadSnapshot = await getDocs(messagesQuery);
+
+                // Use the actual count of unread messages
+                unreadCount = unreadSnapshot.size;
+              } catch (err) {
+                console.error("Error counting unread messages:", err);
+              }
+            }
 
             return {
               ...chat,
@@ -161,15 +184,6 @@ export default function OwnerChatInbox() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        {/* Back Button */}
-        <button
-          onClick={() => router.back()}
-          className="mb-6 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <ChevronLeft className="h-5 w-5 mr-1" />
-          <span>Go Back</span>
-        </button>
-
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

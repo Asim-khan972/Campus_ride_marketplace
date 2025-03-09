@@ -547,7 +547,7 @@ export default function RidePage({ params }) {
                         <div className="flex items-center">
                           <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
                           <p className="text-green-800">
-                            You have already booked this ride.
+                            you have booked this ride
                           </p>
                         </div>
                         <button

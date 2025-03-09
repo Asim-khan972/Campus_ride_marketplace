@@ -263,7 +263,8 @@ export default function Home() {
             (rideFromCity.includes(cityName) ||
               cityName.includes(rideFromCity)) &&
             ride.status === "not_started" &&
-            rideStartDate > currentDate
+            rideStartDate > currentDate &&
+            ride.availableSeats > 0
           ) {
             fetchedRides.push(ride);
           }
@@ -481,7 +482,7 @@ export default function Home() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {profile?.university ? `Rides Near by` : "Available Rides"}
+                  {profile?.university ? `Rides Nearby` : "Available Rides"}
                 </h2>
                 <span className="text-sm bg-[#8163e9]/10 text-[#8163e9] px-3 py-1 rounded-full font-medium">
                   {filteredRides.length}{" "}

@@ -29,7 +29,6 @@ const PublishRide = () => {
   const { user, loading: authLoading } = useAuth();
   const [cars, setCars] = useState([]);
   const [loadingCars, setLoadingCars] = useState(true);
-  const [selectedCar, setSelectedCar] = useState(null);
 
   // Form fields
   const [selectedCarId, setSelectedCarId] = useState("");
@@ -37,8 +36,13 @@ const PublishRide = () => {
   const [pricePerSeat, setPricePerSeat] = useState("");
   const [tollsIncluded, setTollsIncluded] = useState(false);
   const [tollPrice, setTollPrice] = useState("");
+
+  const [selectedCar, setSelectedCar] = useState(null);
+
   const [startDateTime, setStartDateTime] = useState("");
   const [endDateTime, setEndDateTime] = useState("");
+  const [airConditioning, setAirConditioning] = useState(false);
+  const [wifiAvailable, setWifiAvailable] = useState(false);
   const [status, setStatus] = useState("not_started"); // default status
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -80,7 +84,6 @@ const PublishRide = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // Update selected car when car ID changes
   useEffect(() => {
     if (selectedCarId) {
       const car = cars.find((car) => car.id === selectedCarId);
@@ -175,6 +178,8 @@ const PublishRide = () => {
       setDestinationCity("");
       setStartDateTime("");
       setEndDateTime("");
+      setAirConditioning(false);
+      setWifiAvailable(false);
       setStatus("not_started");
       router.push("/my-rides");
     } catch (error) {
@@ -270,18 +275,16 @@ const PublishRide = () => {
     );
   }
 
-  console.log("cars", cars);
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         {/* Header with back button */}
         <div className="flex items-center gap-4 mb-6">
-          <button
+          <ChevronLeft
+            className="h-6 w-6 text-gray-600"
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <ChevronLeft className="h-6 w-6 text-gray-600" />
-          </button>
+          />
+
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-black">
               Publish a Ride
@@ -324,7 +327,7 @@ const PublishRide = () => {
                   <select
                     value={selectedCarId}
                     onChange={(e) => setSelectedCarId(e.target.value)}
-                    className="w-full p-3 border border-gray-300 text-black rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   >
                     <option value="">-- Choose a car --</option>
@@ -336,7 +339,6 @@ const PublishRide = () => {
                   </select>
                 </div>
 
-                {/* Available Seats */}
                 <div>
                   <label className="flex items-center text-sm font-medium text-black mb-2">
                     <Users className="h-4 w-4 mr-2 text-[#8163e9]" />
@@ -385,7 +387,7 @@ const PublishRide = () => {
                     onChange={(e) => setPricePerSeat(e.target.value)}
                     min="0"
                     step="0.01"
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                 </div>
@@ -420,14 +422,13 @@ const PublishRide = () => {
                         onChange={(e) => setTollPrice(e.target.value)}
                         min="0"
                         step="0.01"
-                        className="w-full p-3 border border-gray-300 text-black rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                        className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
                         required
                       />
                     </div>
                   )}
                 </div>
 
-                {/* Locations */}
                 {/* Pickup Location with Autocomplete */}
                 <div className="col-span-2 relative pickup-suggestions">
                   <label className="flex items-center text-sm font-medium text-black mb-2">
@@ -441,7 +442,7 @@ const PublishRide = () => {
                       setPickupLocation(e.target.value);
                       fetchPickupSuggestions(e.target.value);
                     }}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                   {showPickupSuggestions && pickupSuggestions.length > 0 && (
@@ -481,7 +482,7 @@ const PublishRide = () => {
                       setDestinationLocation(e.target.value);
                       fetchDestinationSuggestions(e.target.value);
                     }}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg   focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                   {showDestinationSuggestions &&
@@ -515,15 +516,13 @@ const PublishRide = () => {
                     <Calendar className="h-4 w-4 mr-2 text-[#8163e9]" />
                     Start Date & Time
                   </label>
-                  <div className="relative">
-                    <input
-                      type="datetime-local"
-                      value={startDateTime}
-                      onChange={(e) => setStartDateTime(e.target.value)}
-                      className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors"
-                      required
-                    />
-                  </div>
+                  <input
+                    type="datetime-local"
+                    value={startDateTime}
+                    onChange={(e) => setStartDateTime(e.target.value)}
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    required
+                  />
                 </div>
 
                 {/* End Date & Time */}
@@ -532,15 +531,13 @@ const PublishRide = () => {
                     <Calendar className="h-4 w-4 mr-2 text-[#8163e9]" />
                     End Date & Time
                   </label>
-                  <div className="relative">
-                    <input
-                      type="datetime-local"
-                      value={endDateTime}
-                      onChange={(e) => setEndDateTime(e.target.value)}
-                      className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-transparent transition-colors"
-                      required
-                    />
-                  </div>
+                  <input
+                    type="datetime-local"
+                    value={endDateTime}
+                    onChange={(e) => setEndDateTime(e.target.value)}
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    required
+                  />
                 </div>
               </div>
 

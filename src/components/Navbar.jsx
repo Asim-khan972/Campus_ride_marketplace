@@ -11,7 +11,6 @@ import {
   Bell,
   MessageSquare,
   CheckCheck,
-  MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -81,11 +80,25 @@ export default function Navbar() {
 
         let totalUnread = 0;
 
-        chatsSnapshot.forEach((chatDoc) => {
-          const chatData = chatDoc.data();
-          // Add unread count for this user from the chat document
-          totalUnread += chatData.unreadCount?.[user.uid] || 0;
+        // For each chat, query the actual unread messages
+        const unreadPromises = chatsSnapshot.docs.map(async (chatDoc) => {
+          const chatId = chatDoc.id;
+
+          // Query for unread messages in this chat
+          const messagesRef = collection(db, "chats", chatId, "messages");
+          const messagesQuery = query(
+            messagesRef,
+            where("senderId", "!=", user.uid),
+            where("seen", "==", false)
+          );
+
+          const unreadSnapshot = await getDocs(messagesQuery);
+          return unreadSnapshot.size;
         });
+
+        // Wait for all queries to complete and sum up the results
+        const unreadCounts = await Promise.all(unreadPromises);
+        totalUnread = unreadCounts.reduce((sum, count) => sum + count, 0);
 
         setUnreadMessages(totalUnread);
       } catch (error) {
@@ -156,7 +169,7 @@ export default function Navbar() {
           }
         } else {
           // For ride status updates, go to ride details
-          router.push(`/my-rides/${notification.rideId}`);
+          router.push(`/rides/${notification.rideId}`);
         }
       } else if (notification.bookingId) {
         router.push(`/bookings`);
@@ -207,7 +220,6 @@ export default function Navbar() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  console.log("nofitifications ", notifications, notifications.length);
   return (
     <header className="border-b bg-white">
       <div className="container mx-auto px-4">
@@ -238,7 +250,7 @@ export default function Navbar() {
                   href="/owner/chats"
                   className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
                 >
-                  <MessageCircle className="h-5 w-5 text-black" />
+                  <MessageSquare className="h-5 w-5 text-black" />
                   {unreadMessages > 0 && (
                     <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
                       {unreadMessages > 99 ? "99+" : unreadMessages}
@@ -295,7 +307,7 @@ export default function Navbar() {
               <>
                 {/* Messages with badge (mobile) */}
                 <Link
-                  href="/owner/chats"
+                  href="/chats"
                   className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
                 >
                   <MessageSquare className="h-5 w-5 text-black" />

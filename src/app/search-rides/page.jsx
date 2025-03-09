@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useRef } from "react";
 import {
   Calendar,
@@ -7,13 +8,13 @@ import {
   Search,
   Wind,
   Wifi,
-  DollarSign,
   Users,
   Loader2,
   AlertCircle,
   X,
   Filter,
   ChevronLeft,
+  DollarSign,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, getDocs, orderBy } from "firebase/firestore";
@@ -69,14 +70,11 @@ export default function SearchRides() {
   const [minSeats, setMinSeats] = useState("");
   const [sortBy, setSortBy] = useState("distance");
 
-  const [pickupLocation, setPickupLocation] = useState("");
+  // Location states
   const [pickupCity, setPickupCity] = useState("");
+  const [destinationCity, setDestinationCity] = useState("");
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
-
-  // For Destination Location
-  const [destinationLocation, setDestinationLocation] = useState("");
-  const [destinationCity, setDestinationCity] = useState("");
   const [destinationSuggestions, setDestinationSuggestions] = useState([]);
   const [showDestinationSuggestions, setShowDestinationSuggestions] =
     useState(false);
@@ -105,7 +103,7 @@ export default function SearchRides() {
 
     // If we have from and to, perform the search
     if (from && to) {
-      performSearch(from, to);
+      performSearch(from, to, pick, destination);
     } else {
       setLoading(false);
     }
@@ -130,61 +128,59 @@ export default function SearchRides() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [searchParams]);
 
-  const performSearch = async (from, to) => {
+  const performSearch = async (
+    from,
+    to,
+    pickupCityParam,
+    destinationCityParam
+  ) => {
     setLoading(true);
     setError("");
-
     try {
-      const fromCity = extractCity(from);
-      const toCity = extractCity(to);
-
+      // Extract city names from the full addresses
+      const fromCity = pickupCityParam || extractCity(from).toLowerCase();
+      const toCity = destinationCityParam || extractCity(to).toLowerCase();
       const ridesRef = collection(db, "rides");
       const q = query(ridesRef, orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
-
-      const matchingRides = [];
+      const exactMatches = [];
+      const cityMatches = [];
       const otherAvailableRides = [];
 
       querySnapshot.forEach((doc) => {
         const ride = { id: doc.id, ...doc.data() };
 
-        if (ride.ownerId !== user?.uid) {
-          const rideFromCity = extractCity(ride.pickupLocation);
-          const rideToCity = extractCity(ride.destinationLocation);
+        // Skip rides created by the current user
+        if (ride.ownerId === user?.uid) return;
 
-          if (
-            rideFromCity.toLowerCase().includes(fromCity.toLowerCase()) &&
-            rideToCity.toLowerCase().includes(toCity.toLowerCase())
-          ) {
-            matchingRides.push(ride);
-          } else if (
-            rideFromCity.toLowerCase().includes(fromCity.toLowerCase()) &&
-            !rideToCity.toLowerCase().includes(toCity.toLowerCase())
-          ) {
-            console.log("non matching ride", ride);
-            console.log(
-              "ride",
-              ride.pickupCity,
-              "local",
-              pickupCity,
-              "dest",
-              ride.destinationCity,
-              "local desti",
-              destinationCity
-            );
-            if (
-              ride.pickupCity == pickupCity &&
-              ride.destinationCity == destinationCity
-            ) {
-              otherAvailableRides.push(ride);
-            }
-          }
+        // Extract city names from ride locations
+        const rideFromCity = (
+          ride.pickupCity || extractCity(ride.pickupLocation)
+        ).toLowerCase();
+        const rideToCity = (
+          ride.destinationCity || extractCity(ride.destinationLocation)
+        ).toLowerCase();
+        if (
+          ride.pickupLocation.toLowerCase().includes(from.toLowerCase()) &&
+          ride.destinationLocation.toLowerCase().includes(to.toLowerCase()) &&
+          ride.availableSeats > 0
+        ) {
+          exactMatches.push(ride);
+        } else if (
+          ride.pickupCity == pickupCityParam &&
+          ride.destinationCity == destinationCityParam &&
+          ride.availableSeats > 0
+        ) {
+          otherAvailableRides.push(ride);
         }
       });
 
+      // Combine exact matches and city matches for primary results
+      const allMatches = [...exactMatches, ...cityMatches];
+
       // Sort rides by proximity if coordinates are available
       if (userLocation) {
-        matchingRides.sort((a, b) => {
+        allMatches.sort((a, b) => {
           const distanceA = calculateDistance(
             userLocation.lat,
             userLocation.lng,
@@ -201,8 +197,8 @@ export default function SearchRides() {
         });
       }
 
-      setRides(matchingRides);
-      setFilteredRides(matchingRides);
+      setRides(allMatches);
+      setFilteredRides(allMatches);
       setOtherRides(otherAvailableRides);
     } catch (err) {
       console.error("Error searching rides:", err);
@@ -213,10 +209,6 @@ export default function SearchRides() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    // if (searchForm.from === searchForm.to) {
-    //   setError("Pickup and destination locations cannot be the same.");
-    //   return;
-    // }
 
     // Update URL with new search parameters
     const queryParams = new URLSearchParams({
@@ -231,7 +223,7 @@ export default function SearchRides() {
     router.push(`/search-rides?${queryParams}`);
 
     // Perform the search
-    performSearch(searchForm.from, searchForm.to);
+    performSearch(searchForm.from, searchForm.to, pickupCity, destinationCity);
   };
 
   const handleFilter = () => {
@@ -335,9 +327,6 @@ export default function SearchRides() {
     }
   };
 
-  console.log("other countries", otherRides);
-  console.log("destination city ", destinationCity, "pcikup city ", pickupCity);
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Back button and header */}
@@ -370,7 +359,7 @@ export default function SearchRides() {
                       setSearchForm({ ...searchForm, from: e.target.value });
                       fetchPickupSuggestions(e.target.value);
                     }}
-                    className="w-full pl-10 pr-3 py-3 rounded-lg border-0   focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
+                    className="w-full pl-10 pr-3 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
 
                   {showPickupSuggestions && pickupSuggestions.length > 0 && (
@@ -411,7 +400,7 @@ export default function SearchRides() {
                       setSearchForm({ ...searchForm, to: e.target.value });
                       fetchDestinationSuggestions(e.target.value);
                     }}
-                    className="w-full pl-10 pr-3 py-3 rounded-lg border-0   focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
+                    className="w-full pl-10 pr-3 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white/50 bg-white/10 text-white placeholder-white/60"
                   />
                   {showDestinationSuggestions &&
                     destinationSuggestions.length > 0 && (
@@ -462,6 +451,12 @@ export default function SearchRides() {
                   <Filter className="h-5 w-5" />
                 </button>
               </div>
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-600 text-sm flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
             </form>
           </div>
         </div>
@@ -499,7 +494,7 @@ export default function SearchRides() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full p-2 border rounded-md   focus:ring-[#8163e9] text-black focus:border-transparent"
+                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] text-black focus:border-transparent"
                   >
                     <option value="distance" className="text-black">
                       Distance
@@ -524,7 +519,7 @@ export default function SearchRides() {
                       type="number"
                       value={maxPrice}
                       onChange={(e) => setMaxPrice(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border rounded-md   focus:ring-[#8163e9] focus:border-transparent"
+                      className="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
                       placeholder="No limit"
                     />
                   </div>
@@ -541,7 +536,7 @@ export default function SearchRides() {
                       type="number"
                       value={minSeats}
                       onChange={(e) => setMinSeats(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border rounded-md   focus:ring-[#8163e9] focus:border-transparent"
+                      className="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
                       placeholder="Any"
                     />
                   </div>
@@ -558,103 +553,100 @@ export default function SearchRides() {
 
             {/* Rides List */}
             <div className="flex-1">
-              {error ? (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                </div>
-              ) : loading ? (
+              {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-[#8163e9]" />
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      {searchForm.from && searchForm.to
-                        ? "Search Results"
-                        : "Available Rides"}
-                    </h2>
-                    <span className="text-sm text-gray-500">
-                      {filteredRides.length}{" "}
-                      {filteredRides.length === 1 ? "ride" : "rides"} found
-                    </span>
+                <div className="space-y-8">
+                  {/* Main Results */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold text-gray-900">
+                        {searchForm.from && searchForm.to
+                          ? "Search Results"
+                          : "Available Rides"}
+                      </h2>
+                      <span className="text-sm bg-[#8163e9]/10 text-[#8163e9] px-3 py-1 rounded-full font-medium">
+                        {filteredRides.length}{" "}
+                        {filteredRides.length === 1 ? "ride" : "rides"} found
+                      </span>
+                    </div>
+
+                    {filteredRides.length === 0 ? (
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+                        <Car className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          No rides found
+                        </h3>
+                        <p className="text-gray-500">
+                          Try adjusting your search or filters
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {filteredRides.map((ride) => (
+                          <Link key={ride.id} href={`/rides/${ride.id}`}>
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-[#8163e9] hover:shadow-md transition-all">
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4 text-[#8163e9]" />
+                                    <span className="font-medium text-black">
+                                      {ride.pickupLocation}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4 text-[#8163e9]" />
+                                    <span className="font-medium text-black">
+                                      {ride.destinationLocation}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-[#8163e9]">
+                                    ${ride.pricePerSeat}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    per seat
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>
+                                    {formatDateTime(ride.startDateTime)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Users className="h-4 w-4" />
+                                  <span>{ride.availableSeats} seats left</span>
+                                </div>
+                                {ride.airConditioning && (
+                                  <div className="flex items-center gap-1">
+                                    <Wind className="h-4 w-4" />
+                                    <span>AC</span>
+                                  </div>
+                                )}
+                                {ride.wifiAvailable && (
+                                  <div className="flex items-center gap-1">
+                                    <Wifi className="h-4 w-4" />
+                                    <span>WiFi</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {filteredRides.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
-                      <Car className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        No rides found
-                      </h3>
-                      <p className="text-gray-500">
-                        Try adjusting your search or filters
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-4">
-                      {filteredRides.map((ride) => (
-                        <Link key={ride.id} href={`/home/rides/${ride.id}`}>
-                          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-[#8163e9] hover:shadow-md transition-all">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-[#8163e9]" />
-                                  <span className="font-medium text-black">
-                                    {ride.pickupLocation}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-[#8163e9]" />
-                                  <span className="font-medium text-black">
-                                    {ride.destinationLocation}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-[#8163e9]">
-                                  ${ride.pricePerSeat}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  per seat
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4" />
-                                <span>
-                                  {formatDateTime(ride.startDateTime)}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Users className="h-4 w-4" />
-                                <span>{ride.availableSeats} seats left</span>
-                              </div>
-                              {ride.airConditioning && (
-                                <div className="flex items-center gap-1">
-                                  <Wind className="h-4 w-4" />
-                                  <span>AC</span>
-                                </div>
-                              )}
-                              {ride.wifiAvailable && (
-                                <div className="flex items-center gap-1">
-                                  <Wifi className="h-4 w-4" />
-                                  <span>WiFi</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-
+                  {/* Other Available Rides */}
                   {otherRides.length > 0 && (
-                    <div className="mt-10 pt-8 border-t border-gray-200">
+                    <div className="pt-6 border-t border-gray-200">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-semibold text-gray-900">
                           Other Available Rides
@@ -667,7 +659,7 @@ export default function SearchRides() {
 
                       <div className="grid gap-4">
                         {otherRides.map((ride) => (
-                          <Link key={ride.id} href={`/rides/${ride.id}`}>
+                          <Link key={ride.id} href={`/home/rides/${ride.id}`}>
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-[#8163e9] hover:shadow-md transition-all">
                               <div className="flex items-start justify-between mb-4">
                                 <div className="space-y-2">
