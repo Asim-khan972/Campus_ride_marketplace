@@ -67,40 +67,133 @@ async function getOrCreateChat(ownerId, riderId) {
 async function bookSeats(rideId, riderId, seatsToBook) {
   const rideRef = doc(db, "rides", rideId);
   const bookingsRef = collection(db, "bookings");
+
   try {
+    let rideData;
+    let ownerData;
+    let passengerData;
+    let chatId;
+    let bookingId;
+
     await runTransaction(db, async (transaction) => {
+      // Get ride details
       const rideDoc = await transaction.get(rideRef);
       if (!rideDoc.exists()) {
         throw new Error("Ride does not exist");
       }
-      const rideData = rideDoc.data();
+      rideData = { id: rideId, ...rideDoc.data() };
+
+      // Check seats availability
       const currentSeats = rideData.availableSeats;
       if (currentSeats < seatsToBook) {
         throw new Error("Not enough available seats");
       }
+
+      // Get owner and passenger details
+      const [ownerDoc, passengerDoc] = await Promise.all([
+        getDoc(doc(db, "users", rideData.ownerId)),
+        getDoc(doc(db, "users", riderId)),
+      ]);
+
+      if (!ownerDoc.exists() || !passengerDoc.exists()) {
+        throw new Error("User details not found");
+      }
+
+      ownerData = ownerDoc.data();
+      passengerData = passengerDoc.data();
+
+      // Update ride seats
       transaction.update(rideRef, {
         availableSeats: currentSeats - seatsToBook,
+        latestBookingTime: serverTimestamp(), // Add this line to store the current time
       });
+
+      // Create booking
       const bookingData = {
         rideId,
         riderId,
         seatsBooked: seatsToBook,
         bookingTime: serverTimestamp(),
-        status: "active",
+        status: "confirmed",
       };
-      await addDoc(bookingsRef, bookingData);
 
-      // Create notification for ride owner
-      const notificationsRef = collection(db, "notifications");
-      await addDoc(notificationsRef, {
-        userId: rideData.ownerId,
-        type: "booking",
-        message: `Someone booked ${seatsToBook} seat(s) on your ride from ${rideData.pickupCity} to ${rideData.destinationCity}`,
-        read: false,
-        createdAt: serverTimestamp(),
-        rideId: rideId,
-      });
+      // We'll add the booking outside the transaction to get the ID
     });
+
+    // Create the booking and get its ID
+    const bookingRef = await addDoc(bookingsRef, {
+      rideId,
+      riderId,
+      seatsBooked: seatsToBook,
+      bookingTime: serverTimestamp(),
+      status: "confirmed",
+    });
+    bookingId = bookingRef.id;
+
+    // Create or get existing chat
+    chatId = await getOrCreateChat(rideData.ownerId, riderId);
+
+    // After successful transaction, send chat message and emails
+    if (chatId) {
+      // Send system message in chat
+      const messagesRef = collection(db, "chats", chatId, "messages");
+      await addDoc(messagesRef, {
+        text: `Booking confirmed! ${seatsToBook} seat(s) booked from ${
+          rideData.pickupLocation
+        } to ${rideData.destinationLocation} on ${new Date(
+          rideData.startDateTime
+        ).toLocaleString()}`,
+        senderId: "system",
+        createdAt: serverTimestamp(),
+      });
+
+      // Update chat's last message
+      await updateDoc(doc(db, "chats", chatId), {
+        lastMessage: "Booking confirmed!",
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // Send notification to ride owner
+    await addDoc(collection(db, "notifications"), {
+      userId: rideData.ownerId,
+      title: "New Booking",
+      message: `${
+        passengerData.fullName || "Someone"
+      } has booked ${seatsToBook} seat(s) for your ride from ${
+        rideData.pickupLocation
+      } to ${rideData.destinationLocation}`,
+      type: "booking",
+      bookingId: bookingId,
+      rideId: rideId,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+
+    // Send notification to rider
+    await addDoc(collection(db, "notifications"), {
+      userId: riderId,
+      title: "Booking Confirmed",
+      message: `Your booking for ${seatsToBook} seat(s) from ${rideData.pickupLocation} to ${rideData.destinationLocation} has been confirmed.`,
+      type: "booking",
+      bookingId: bookingId,
+      rideId: rideId,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+
+    // Send email notifications
+    const emailDetails = {
+      ...rideData,
+      seatsBooked: seatsToBook,
+      totalPrice: seatsToBook * rideData.pricePerSeat,
+    };
+    // await sendEmailNotifications(
+    //   emailDetails,
+    //   ownerData.email,
+    //   passengerData.email
+    // );
+
     return { success: true };
   } catch (error) {
     console.error("Booking failed:", error);

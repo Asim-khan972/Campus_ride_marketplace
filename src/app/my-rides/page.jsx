@@ -67,9 +67,12 @@ export default function DriverDashboard() {
       return;
     }
 
+    // Update the sorting logic to use the latestBookingTime field directly from the ride document
+
+    // Replace the fetchRidesWithBookings function with this updated version
     const fetchRidesWithBookings = async () => {
       try {
-        // First, get all rides owned by the user
+        // Get all rides owned by the user
         const ridesRef = collection(db, "rides");
         const q = query(ridesRef, where("ownerId", "==", user.uid));
 
@@ -88,16 +91,34 @@ export default function DriverDashboard() {
           );
           const bookingsSnapshot = await getDocs(bookingsQuery);
 
+          // Add hasBookings flag and bookingsCount
           ride.hasBookings = !bookingsSnapshot.empty;
           ride.bookingsCount = bookingsSnapshot.size;
 
           ridesData.push(ride);
         }
 
-        // Sort rides: first by hasBookings (true first), then by status, then by startDateTime
+        // Sort rides:
+        // 1. First by hasBookings (rides with bookings come first)
+        // 2. Then by latestBookingTime for rides with bookings
+        // 3. Then by status (current rides before previous)
+        // 4. Finally by ride start date (newest first)
         ridesData.sort((a, b) => {
+          // First sort by hasBookings (rides with bookings come first)
           if (a.hasBookings && !b.hasBookings) return -1;
           if (!a.hasBookings && b.hasBookings) return 1;
+
+          // If both have bookings, sort by latestBookingTime
+          if (a.hasBookings && b.hasBookings) {
+            // Convert Firebase timestamps to JavaScript Date objects for comparison
+            const aTime = a.latestBookingTime?.toDate?.() || new Date(0);
+            const bTime = b.latestBookingTime?.toDate?.() || new Date(0);
+
+            // Sort by most recent booking (newest first)
+            return bTime - aTime;
+          }
+
+          // If neither have bookings or we've sorted by booking time, sort by status
           const currentStatuses = [
             "not_started",
             "waiting_for_customer",
@@ -109,8 +130,8 @@ export default function DriverDashboard() {
           if (aIsCurrent && !bIsCurrent) return -1;
           if (!aIsCurrent && bIsCurrent) return 1;
 
-          // If both are current or both are not current, sort by date
-          return new Date(a.startDateTime) - new Date(b.startDateTime);
+          // If both are current or both are not current, sort by ride start date (newest first)
+          return new Date(b.startDateTime) - new Date(a.startDateTime);
         });
 
         setRides(ridesData);
@@ -216,9 +237,9 @@ export default function DriverDashboard() {
         ride.hasBookings
           ? "border-[#8163e9]/30 bg-[#8163e9]/5"
           : "border-gray-200"
-      } overflow-hidden hover:shadow-md transition-shadow`}
+      } overflow-hidden hover:shadow-md transition-shadow min-w-0`}
     >
-      <div className="p-4 sm:p-6">
+      <div className="p-4 sm:p-8">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -333,6 +354,22 @@ export default function DriverDashboard() {
           </div>
         </div>
 
+        {/* Amenities */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {ride.airConditioning && (
+            <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700">
+              <Wind className="h-3 w-3 mr-1" />
+              AC
+            </span>
+          )}
+          {ride.wifiAvailable && (
+            <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700">
+              <Wifi className="h-3 w-3 mr-1" />
+              WiFi
+            </span>
+          )}
+        </div>
+
         {/* Action Button */}
         <Link
           href={`/my-rides/${ride.id}`}
@@ -347,7 +384,7 @@ export default function DriverDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <button
@@ -413,7 +450,7 @@ export default function DriverDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+              <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
                 {currentRides.map((ride) => (
                   <RideCard key={ride.id} ride={ride} />
                 ))}
@@ -437,7 +474,7 @@ export default function DriverDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+              <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
                 {previousRides.map((ride) => (
                   <RideCard key={ride.id} ride={ride} />
                 ))}

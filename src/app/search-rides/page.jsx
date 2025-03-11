@@ -582,7 +582,7 @@ export default function SearchRides() {
                     ) : (
                       <div className="grid gap-4">
                         {filteredRides.map((ride) => (
-                          <Link key={ride.id} href={`/rides/${ride.id}`}>
+                          <Link key={ride.id} href={`/home/rides/${ride.id}`}>
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-[#8163e9] hover:shadow-md transition-all">
                               <div className="flex items-start justify-between mb-4">
                                 <div className="space-y-2">
@@ -620,18 +620,6 @@ export default function SearchRides() {
                                   <Users className="h-4 w-4" />
                                   <span>{ride.availableSeats} seats left</span>
                                 </div>
-                                {ride.airConditioning && (
-                                  <div className="flex items-center gap-1">
-                                    <Wind className="h-4 w-4" />
-                                    <span>AC</span>
-                                  </div>
-                                )}
-                                {ride.wifiAvailable && (
-                                  <div className="flex items-center gap-1">
-                                    <Wifi className="h-4 w-4" />
-                                    <span>WiFi</span>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </Link>
