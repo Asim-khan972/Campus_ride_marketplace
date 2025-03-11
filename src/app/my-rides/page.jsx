@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import {
@@ -8,6 +9,7 @@ import {
   onSnapshot,
   doc,
   deleteDoc,
+  getDocs,
 } from "firebase/firestore";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +29,7 @@ import {
   Trash2,
   X,
   CheckCircle2,
+  Edit,
 } from "lucide-react";
 
 const statusColors = {
@@ -64,18 +67,70 @@ export default function DriverDashboard() {
       return;
     }
 
+    const fetchRidesWithBookings = async () => {
+      try {
+        // First, get all rides owned by the user
+        const ridesRef = collection(db, "rides");
+        const q = query(ridesRef, where("ownerId", "==", user.uid));
+
+        const ridesSnapshot = await getDocs(q);
+        const ridesData = [];
+
+        // For each ride, check if it has any bookings
+        for (const rideDoc of ridesSnapshot.docs) {
+          const ride = { id: rideDoc.id, ...rideDoc.data() };
+
+          // Check for bookings
+          const bookingsRef = collection(db, "bookings");
+          const bookingsQuery = query(
+            bookingsRef,
+            where("rideId", "==", ride.id)
+          );
+          const bookingsSnapshot = await getDocs(bookingsQuery);
+
+          ride.hasBookings = !bookingsSnapshot.empty;
+          ride.bookingsCount = bookingsSnapshot.size;
+
+          ridesData.push(ride);
+        }
+
+        // Sort rides: first by hasBookings (true first), then by status, then by startDateTime
+        ridesData.sort((a, b) => {
+          if (a.hasBookings && !b.hasBookings) return -1;
+          if (!a.hasBookings && b.hasBookings) return 1;
+          const currentStatuses = [
+            "not_started",
+            "waiting_for_customer",
+            "started",
+          ];
+          const aIsCurrent = currentStatuses.includes(a.status);
+          const bIsCurrent = currentStatuses.includes(b.status);
+
+          if (aIsCurrent && !bIsCurrent) return -1;
+          if (!aIsCurrent && bIsCurrent) return 1;
+
+          // If both are current or both are not current, sort by date
+          return new Date(a.startDateTime) - new Date(b.startDateTime);
+        });
+
+        setRides(ridesData);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error fetching rides:", err);
+        setError("Failed to load rides. Please try again.");
+        setLoading(false);
+      }
+    };
+
+    // Set up real-time listener for rides
     const ridesRef = collection(db, "rides");
     const q = query(ridesRef, where("ownerId", "==", user.uid));
 
     const unsubscribe = onSnapshot(
       q,
-      (snapshot) => {
-        const fetchedRides = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setRides(fetchedRides);
-        setLoading(false);
+      () => {
+        // When rides change, fetch rides with bookings info
+        fetchRidesWithBookings();
       },
       (err) => {
         console.error("Error fetching rides:", err);
@@ -156,25 +211,51 @@ export default function DriverDashboard() {
   }
 
   const RideCard = ({ ride }) => (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+    <div
+      className={`bg-white rounded-lg shadow-sm border ${
+        ride.hasBookings
+          ? "border-[#8163e9]/30 bg-[#8163e9]/5"
+          : "border-gray-200"
+      } overflow-hidden hover:shadow-md transition-shadow`}
+    >
       <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              statusColors[ride.status]
-            }`}
-          >
-            {ride.status.replace(/_/g, " ").charAt(0).toUpperCase() +
-              ride.status.slice(1).replace(/_/g, " ")}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                statusColors[ride.status]
+              }`}
+            >
+              {ride.status.replace(/_/g, " ").charAt(0).toUpperCase() +
+                ride.status.slice(1).replace(/_/g, " ")}
+            </span>
+            {ride.hasBookings && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#8163e9] text-white">
+                {ride.bookingsCount}{" "}
+                {ride.bookingsCount === 1 ? "booking" : "bookings"}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center text-sm text-black">
               <Clock className="h-4 w-4 mr-1 text-[#8163e9]" />
               <span>{formatDateTime(ride.startDateTime)}</span>
             </div>
+            <Link href={`/edit-ride/${ride.id}`}>
+              <button
+                className="p-1 hover:bg-blue-50 rounded-full transition-colors"
+                aria-label="Edit ride"
+              >
+                <Edit className="h-4 w-4 text-blue-500" />
+              </button>
+            </Link>
             <button
-              onClick={() => setDeleteConfirm(ride.id)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDeleteConfirm(ride.id);
+              }}
               className="p-1 hover:bg-red-50 rounded-full transition-colors"
               aria-label="Delete ride"
             >
@@ -191,13 +272,21 @@ export default function DriverDashboard() {
             </p>
             <div className="flex space-x-2">
               <button
-                onClick={() => setDeleteConfirm(null)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDeleteConfirm(null);
+                }}
                 className="flex-1 py-1.5 px-3 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors text-sm"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleDeleteRide(ride.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDeleteRide(ride.id);
+                }}
                 disabled={deleteLoading}
                 className="flex-1 py-1.5 px-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm flex items-center justify-center"
               >

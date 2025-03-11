@@ -227,16 +227,26 @@ export default function SearchRides() {
   };
 
   const handleFilter = () => {
+    // Apply filters to main rides
     let tempRides = [...rides];
+    let tempOtherRides = [...otherRides];
 
-    // Apply filters
-    if (maxPrice) {
+    // Apply price filter
+    if (maxPrice && maxPrice !== "") {
       tempRides = tempRides.filter(
         (ride) => Number(ride.pricePerSeat) <= Number(maxPrice)
       );
+      tempOtherRides = tempOtherRides.filter(
+        (ride) => Number(ride.pricePerSeat) <= Number(maxPrice)
+      );
     }
-    if (minSeats) {
+
+    // Apply seats filter
+    if (minSeats && minSeats !== "") {
       tempRides = tempRides.filter(
+        (ride) => Number(ride.availableSeats) >= Number(minSeats)
+      );
+      tempOtherRides = tempOtherRides.filter(
         (ride) => Number(ride.availableSeats) >= Number(minSeats)
       );
     }
@@ -247,34 +257,23 @@ export default function SearchRides() {
         tempRides.sort(
           (a, b) => Number(a.pricePerSeat) - Number(b.pricePerSeat)
         );
+        tempOtherRides.sort(
+          (a, b) => Number(a.pricePerSeat) - Number(b.pricePerSeat)
+        );
         break;
       case "date":
         tempRides.sort(
           (a, b) => new Date(a.startDateTime) - new Date(b.startDateTime)
         );
-        break;
-      case "distance":
-        if (userLocation) {
-          tempRides.sort((a, b) => {
-            const distanceA = calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              a.pickupLat || 0,
-              a.pickupLng || 0
-            );
-            const distanceB = calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              b.pickupLat || 0,
-              b.pickupLng || 0
-            );
-            return distanceA - distanceB;
-          });
-        }
+        tempOtherRides.sort(
+          (a, b) => new Date(a.startDateTime) - new Date(b.startDateTime)
+        );
         break;
     }
 
     setFilteredRides(tempRides);
+    setOtherRides(tempOtherRides);
+
     if (window.innerWidth < 768) {
       setIsFilterOpen(false);
     }
@@ -494,11 +493,8 @@ export default function SearchRides() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full p-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] text-black focus:border-transparent"
+                    className="w-full p-2 border rounded-md  focus:ring-[#8163e9] text-black focus:border-transparent"
                   >
-                    <option value="distance" className="text-black">
-                      Distance
-                    </option>
                     <option value="price" className="text-black">
                       Price
                     </option>
@@ -519,7 +515,7 @@ export default function SearchRides() {
                       type="number"
                       value={maxPrice}
                       onChange={(e) => setMaxPrice(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
+                      className="w-full pl-9 pr-3 py-2 border rounded-md  text-black focus:ring-[#8163e9] focus:border-transparent"
                       placeholder="No limit"
                     />
                   </div>
@@ -536,7 +532,7 @@ export default function SearchRides() {
                       type="number"
                       value={minSeats}
                       onChange={(e) => setMinSeats(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-[#8163e9] focus:border-transparent"
+                      className="w-full pl-9 pr-3 py-2 border rounded-md  text-black focus:ring-[#8163e9] focus:border-transparent"
                       placeholder="Any"
                     />
                   </div>
