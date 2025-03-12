@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
   sendEmailVerification,
@@ -18,6 +18,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import Link from "next/link";
+import { doc, getDoc } from "firebase/firestore";
 
 const Signin = () => {
   const router = useRouter();
@@ -65,7 +66,18 @@ const Signin = () => {
         return;
       }
 
-      router.push("/home");
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      console.log(userDoc);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (!userData.university) {
+          router.push("/profileform");
+        } else {
+          router.push("/home");
+        }
+      } else {
+        router.push("/profileform");
+      }
     } catch (err) {
       setError(err.message.replace("Firebase: ", ""));
       setLoading(false);
@@ -79,6 +91,7 @@ const Signin = () => {
 
     try {
       if (auth.currentUser) {
+        console.log("auth current user ");
         await sendEmailVerification(auth.currentUser);
         setMessage("Verification email sent. Please check your inbox.");
       }

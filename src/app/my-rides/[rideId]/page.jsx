@@ -117,9 +117,9 @@ export default function RideDetailsPage() {
         querySnapshot.forEach((doc) => {
           const booking = { id: doc.id, ...doc.data() };
           bookingsData.push(booking);
-
+          console.log("booking booking", booking);
           // Calculate total seats and revenue
-          if (booking.status === "active") {
+          if (booking.status === "confirmed") {
             seats += booking.seatsBooked || 0;
             revenue += (booking.seatsBooked || 0) * (ride?.pricePerSeat || 0);
           }

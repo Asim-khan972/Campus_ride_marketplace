@@ -354,22 +354,6 @@ export default function DriverDashboard() {
           </div>
         </div>
 
-        {/* Amenities */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {ride.airConditioning && (
-            <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700">
-              <Wind className="h-3 w-3 mr-1" />
-              AC
-            </span>
-          )}
-          {ride.wifiAvailable && (
-            <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700">
-              <Wifi className="h-3 w-3 mr-1" />
-              WiFi
-            </span>
-          )}
-        </div>
-
         {/* Action Button */}
         <Link
           href={`/my-rides/${ride.id}`}

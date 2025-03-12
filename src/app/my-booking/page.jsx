@@ -92,7 +92,14 @@ export default function MyBookingsPage() {
               const rideDoc = await getDoc(
                 doc(db, "rides", bookingData.rideId)
               );
-              if (rideDoc.exists()) {
+              if (rideDoc.exists() && bookingData.status == "confirmed") {
+                console.log(
+                  "confirmed",
+                  rideDoc.data(),
+                  "booking data",
+                  bookingData
+                );
+
                 return { ...bookingData, ride: rideDoc.data() };
               } else {
                 return { ...bookingData, ride: null };
@@ -182,6 +189,7 @@ export default function MyBookingsPage() {
       new Date(booking.ride.endDateTime) >= currentDate
   );
 
+  console.log("bookings", bookings);
   const BookingCard = ({ booking, type }) => (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       <div className="p-4 sm:p-6">
@@ -259,22 +267,6 @@ export default function MyBookingsPage() {
                   <span>Toll Price</span>
                 </div>
                 <span className="font-medium">${booking.ride.tollPrice}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Amenities */}
-          <div className="flex items-center space-x-4">
-            {booking.ride.wifiAvailable && (
-              <div className="flex items-center space-x-1 text-black">
-                <Wifi className="h-4 w-4 text-[#8163e9]" />
-                <span className="text-sm">WiFi</span>
-              </div>
-            )}
-            {booking.ride.airConditioning && (
-              <div className="flex items-center space-x-1 text-black">
-                <Wind className="h-4 w-4 text-[#8163e9]" />
-                <span className="text-sm">AC</span>
               </div>
             )}
           </div>

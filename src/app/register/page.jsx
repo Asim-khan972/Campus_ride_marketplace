@@ -39,8 +39,8 @@ const Signup = () => {
   }, [timer, isRegistered]);
 
   const validateEmail = (email) => {
-    // Check if email ends with .edu
-    if (!email.toLowerCase().endsWith(".edu")) {
+    // Check if email contains .edu
+    if (!email.toLowerCase().includes(".edu")) {
       return "Only .edu email addresses are allowed";
     }
     return null;
@@ -63,12 +63,12 @@ const Signup = () => {
     setIsLoading(true);
 
     // Validate email domain
-    const emailError = validateEmail(email);
-    if (emailError) {
-      setError(emailError);
-      setIsLoading(false);
-      return;
-    }
+    // const emailError = validateEmail(email);
+    // if (emailError) {
+    //   setError(emailError);
+    //   setIsLoading(false);
+    //   return;
+    // }
 
     // Validate password
     const passwordError = validatePassword(password);
@@ -113,7 +113,7 @@ const Signup = () => {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
-      router.push("/profileform");
+      // router.push("/profileform");
     } catch (err) {
       setError(err.message.replace("Firebase: ", ""));
     }
@@ -136,8 +136,25 @@ const Signup = () => {
     setIsLoading(false);
   };
 
-  const handleContinue = () => {
-    router.push("/splash");
+  const handleContinue = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await currentUser.reload();
+        if (currentUser.emailVerified) {
+          router.push("/profileform");
+        } else {
+          setError("Please verify your email before continuing");
+          await auth.signOut();
+          router.push("/login");
+        }
+      } else {
+        setError("User not found. Please log in again.");
+        router.push("/login");
+      }
+    } catch (err) {
+      setError(err.message.replace("Firebase: ", ""));
+    }
   };
 
   return (

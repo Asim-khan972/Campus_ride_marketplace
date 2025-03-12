@@ -67,7 +67,6 @@ export default function Navbar() {
       }
     );
 
-    // Count unread messages across all chats
     const fetchUnreadMessages = async () => {
       try {
         // Get all chats where the user is a participant
@@ -80,25 +79,11 @@ export default function Navbar() {
 
         let totalUnread = 0;
 
-        // For each chat, query the actual unread messages
-        const unreadPromises = chatsSnapshot.docs.map(async (chatDoc) => {
-          const chatId = chatDoc.id;
-
-          // Query for unread messages in this chat
-          const messagesRef = collection(db, "chats", chatId, "messages");
-          const messagesQuery = query(
-            messagesRef,
-            where("senderId", "!=", user.uid),
-            where("seen", "==", false)
-          );
-
-          const unreadSnapshot = await getDocs(messagesQuery);
-          return unreadSnapshot.size;
+        chatsSnapshot.forEach((chatDoc) => {
+          const chatData = chatDoc.data();
+          // Add unread count for this user from the chat document
+          totalUnread += chatData.unreadCount?.[user.uid] || 0;
         });
-
-        // Wait for all queries to complete and sum up the results
-        const unreadCounts = await Promise.all(unreadPromises);
-        totalUnread = unreadCounts.reduce((sum, count) => sum + count, 0);
 
         setUnreadMessages(totalUnread);
       } catch (error) {
