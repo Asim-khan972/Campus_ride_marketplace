@@ -63,12 +63,12 @@ const Signup = () => {
     setIsLoading(true);
 
     // Validate email domain
-    // const emailError = validateEmail(email);
-    // if (emailError) {
-    //   setError(emailError);
-    //   setIsLoading(false);
-    //   return;
-    // }
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setError(emailError);
+      setIsLoading(false);
+      return;
+    }
 
     // Validate password
     const passwordError = validatePassword(password);
