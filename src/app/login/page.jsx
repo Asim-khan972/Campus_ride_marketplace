@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -22,6 +22,7 @@ import { doc, getDoc } from "firebase/firestore";
 
 const Signin = () => {
   const router = useRouter();
+  const pathname = usePathname();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,6 +31,7 @@ const Signin = () => {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const isMarketplace = pathname?.includes("/marketplace");
 
   const validateEmail = (email) => {
     // Check if email ends with .edu
@@ -73,7 +75,11 @@ const Signin = () => {
         if (!userData.university) {
           router.push("/profileform");
         } else {
-          router.push("/home");
+          if (isMarketplace) {
+            router.push("/marketplace");
+          } else {
+            router.push("/home");
+          }
         }
       } else {
         router.push("/profileform");

@@ -30,6 +30,8 @@ import {
   LayoutDashboard,
   MapPin,
   Trash2,
+  CarFront,
+  CarTaxiFront,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -218,10 +220,26 @@ const MyProfile = () => {
     {
       title: "About",
       description: "Details About us",
-      icon: Settings,
+      icon: CarTaxiFront,
       href: "/about",
       color: "bg-gray-100",
       iconColor: "text-gray-600",
+    },
+    {
+      title: "My Request",
+      description: "My Requested Rides",
+      icon: CarFront,
+      href: "/my-requested-rides",
+      color: "bg-gray-100",
+      iconColor: "text-indigo-600",
+    },
+    {
+      title: "Requested Rides",
+      description: "Requested Rides to me",
+      icon: Settings,
+      href: "/available-requests",
+      color: "bg-gray-100",
+      iconColor: "text-purple-600",
     },
   ];
 
@@ -310,6 +328,7 @@ const MyProfile = () => {
                   </div>
 
                   {/* Logout Button */}
+
                   <button
                     onClick={handleLogout}
                     disabled={isLoggingOut || isDeleting}
@@ -332,6 +351,12 @@ const MyProfile = () => {
                     <Trash2 className="w-5 h-5" />
                     Delete Account
                   </button>
+                  <Link href="/marketplace/profile">
+                    <button className="w-full py-2 mt-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                      <UserCircle className="w-5 h-5" />
+                      Switch to Marketplace Profile
+                    </button>
+                  </Link>
                 </div>
               </div>
             </div>

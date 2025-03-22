@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import toast, { Toaster } from "react-hot-toast";
 
 import AppWrapper from "@/components/AppWrapper";
 import Navbar from "@/components/Navbar";

@@ -342,7 +342,7 @@ const PublishRide = () => {
                 <div>
                   <label className="flex items-center text-sm font-medium text-black mb-2">
                     <Users className="h-4 w-4 mr-2 text-[#8163e9]" />
-                    Available Seats
+                    Number of Passengers
                   </label>
                   {selectedCar ? (
                     <select
@@ -379,7 +379,7 @@ const PublishRide = () => {
                 <div>
                   <label className="flex items-center text-sm font-medium text-black mb-2">
                     <DollarSign className="h-4 w-4 mr-2 text-[#8163e9]" />
-                    Price Per Seat ($)
+                    Max Rate ($)
                   </label>
                   <input
                     type="number"
@@ -439,7 +439,6 @@ const PublishRide = () => {
                     type="text"
                     value={pickupLocation}
                     onChange={(e) => {
-                      setPickupLocation(e.target.value);
                       fetchPickupSuggestions(e.target.value);
                     }}
                     className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"

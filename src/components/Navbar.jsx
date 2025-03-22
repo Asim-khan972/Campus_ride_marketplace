@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Menu,
   X,
@@ -11,9 +11,12 @@ import {
   Bell,
   MessageSquare,
   CheckCheck,
+  ChevronDown,
+  ShoppingBag,
+  Car,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -30,11 +33,25 @@ import {
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [campusDropdownOpen, setCampusDropdownOpen] = useState(false);
+  const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // Determine if we're in marketplace section
+  const isMarketplace = pathname?.includes("/marketplace");
+
+  // Refs for handling dropdown menus
+  const campusDropdownRef = useRef(null);
+  const createDropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   // Fetch notifications and unread message counts
   useEffect(() => {
@@ -103,6 +120,43 @@ export default function Navbar() {
     };
   }, [user]);
 
+  // Handle clicks outside dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Campus dropdown
+      if (
+        campusDropdownRef.current &&
+        !campusDropdownRef.current.contains(event.target)
+      ) {
+        // Add a small delay before closing to make selection easier
+        setTimeout(() => setCampusDropdownOpen(false), 100);
+      }
+
+      // Create dropdown
+      if (
+        createDropdownRef.current &&
+        !createDropdownRef.current.contains(event.target)
+      ) {
+        // Add a small delay before closing to make selection easier
+        setTimeout(() => setCreateDropdownOpen(false), 100);
+      }
+
+      // Search input - don't close if clicking on the search input itself
+      if (
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target) &&
+        searchExpanded
+      ) {
+        setSearchExpanded(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [campusDropdownOpen, createDropdownOpen, searchExpanded]);
+
   const toggleNotifications = () => {
     setNotificationsOpen(!notificationsOpen);
     if (!notificationsOpen) {
@@ -158,6 +212,8 @@ export default function Navbar() {
         }
       } else if (notification.bookingId) {
         router.push(`/bookings`);
+      } else if (notification.listingId) {
+        router.push(`/marketplace/listing/${notification.listingId}`);
       }
 
       setNotificationsOpen(false);
@@ -205,18 +261,59 @@ export default function Navbar() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      if (isMarketplace) {
+        router.push(`/marketplace/search?q=${encodeURIComponent(searchQuery)}`);
+      } else {
+        router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+      }
+      setSearchQuery("");
+      setSearchExpanded(false);
+    }
+  };
+
   return (
-    <header className="border-b bg-white">
+    <header className="border-b bg-white sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
+          {/* Logo and Campus Dropdown */}
           <div className="flex items-center">
-            <Link
-              href={user ? "/home" : "/"}
-              className="text-2xl font-bold text-[#8163e9]"
+            <div
+              className="relative"
+              ref={campusDropdownRef}
+              onMouseEnter={() => setCampusDropdownOpen(true)}
             >
-              Campus Rides
-            </Link>
+              <button className="flex items-center text-2xl font-bold text-[#8163e9] hover:text-[#6f51d9] transition-colors">
+                Campus
+                <ChevronDown
+                  className={`ml-1 h-4 w-4 transition-transform ${
+                    campusDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Campus Dropdown Menu */}
+              {campusDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                  <Link
+                    href={user ? "/home" : "/"}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                    onClick={() => setCampusDropdownOpen(false)}
+                  >
+                    Campus Rides
+                  </Link>
+                  <Link
+                    href={user ? "/marketplace" : "/marketplace-home"}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                    onClick={() => setCampusDropdownOpen(false)}
+                  >
+                    Campus Marketplace
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Desktop Actions */}
@@ -256,17 +353,100 @@ export default function Navbar() {
                   )}
                 </button>
 
-                <Link href="/publish-ride">
-                  <button className="flex items-center gap-2 bg-[#8163e9] text-white px-4 py-2 rounded-md hover:bg-[#8163e9]/90 transition-colors">
+                {/* Context-aware Create Dropdown */}
+                <div
+                  className="relative"
+                  ref={createDropdownRef}
+                  onMouseEnter={() => setCreateDropdownOpen(true)}
+                >
+                  <button className="flex items-center gap-2 bg-[#8163e9] text-white px-4 py-2 rounded-md hover:bg-[#6f51d9] transition-colors">
                     <Plus className="h-4 w-4" />
-                    Publish a ride
+                    {isMarketplace ? (
+                      <>
+                        <span>Marketplace</span>
+                      </>
+                    ) : (
+                      <>
+                        <Car className="h-4 w-4" />
+                        <span>Rides</span>
+                      </>
+                    )}
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        createDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
-                </Link>
-                <Link href="/my-profile">
-                  <button className="p-2 hover:bg-gray-100 rounded-md transition-colors">
-                    <User2 className="h-5 w-5 text-black" />
-                  </button>
-                </Link>
+
+                  {/* Context-aware Dropdown Menu */}
+                  {createDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                      {isMarketplace ? (
+                        <>
+                          <Link
+                            href="/marketplace/create-listing"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                            onClick={() => setCreateDropdownOpen(false)}
+                          >
+                            Create Listing
+                          </Link>
+                          <Link
+                            href="/marketplace/my-listings"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                            onClick={() => setCreateDropdownOpen(false)}
+                          >
+                            My Listings
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link
+                            href="/publish-ride"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                            onClick={() => setCreateDropdownOpen(false)}
+                          >
+                            Publish a Ride
+                          </Link>
+                          <Link
+                            href="/request-ride"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                            onClick={() => setCreateDropdownOpen(false)}
+                          >
+                            Request a Ride
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <>
+                  {(() => {
+                    if (isMarketplace) {
+                      return (
+                        <Link
+                          href="/marketplace/profile"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          <button className="flex items-center gap-2  text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
+                            <User2 className="h-4 w-4 text-black" />
+                          </button>
+                        </Link>
+                      );
+                    } else {
+                      return (
+                        <Link
+                          href="/my-profile"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          <button className="flex items-center gap-2  text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
+                            <User2 className="h-4 w-4 text-black" />
+                          </button>
+                        </Link>
+                      );
+                    }
+                  })()}
+                </>
               </>
             ) : (
               <>
@@ -286,8 +466,16 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button and Actions */}
           <div className="flex items-center gap-4 md:hidden">
+            {/* Mobile Search */}
+            <button
+              onClick={() => setSearchExpanded(!searchExpanded)}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <Search className="h-5 w-5 text-black" />
+            </button>
+
             {!authLoading && user && (
               <>
                 {/* Messages with badge (mobile) */}
@@ -331,42 +519,145 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* Mobile Search Expanded */}
+        {searchExpanded && (
+          <div className="md:hidden py-2 px-2 border-t">
+            <form onSubmit={handleSearch} className="relative w-full">
+              <input
+                type="text"
+                placeholder={
+                  isMarketplace ? "Search marketplace..." : "Search rides..."
+                }
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full py-2 pl-9 pr-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#8163e9] focus:border-[#8163e9]"
+                autoFocus
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            </form>
+          </div>
+        )}
+
         {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t">
             <nav className="flex flex-col space-y-4">
               {!authLoading && user ? (
                 <>
+                  {/* Campus Options */}
+                  <div className="px-4 py-2 bg-gray-50 rounded-md">
+                    <h3 className="text-sm font-semibold text-gray-500 mb-2">
+                      Campus
+                    </h3>
+                    <Link
+                      href="/home"
+                      className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Campus Rides
+                    </Link>
+                    <Link
+                      href="/marketplace"
+                      className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Campus Marketplace
+                    </Link>
+                  </div>
+
                   <Link
                     href="/about"
                     className="text-gray-600 hover:text-gray-900 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
                   >
                     About
                   </Link>
-                  <Link href="/publish-ride">
-                    <button className="flex items-center gap-2 bg-[#8163e9] text-white px-4 py-2 rounded-md hover:bg-[#8163e9]/90 transition-colors w-full justify-center">
-                      <Plus className="h-4 w-4" />
-                      Publish a ride
-                    </button>
-                  </Link>
-                  <Link href="/my-profile">
-                    <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
-                      <User2 className="h-4 w-4 text-black" />
-                      My Profile
-                    </button>
-                  </Link>
+
+                  {/* Context-aware Options */}
+                  <div className="px-4 py-2 bg-gray-50 rounded-md">
+                    <h3 className="text-sm font-semibold text-gray-500 mb-2">
+                      {isMarketplace ? "Marketplace" : "Rides"}
+                    </h3>
+                    {isMarketplace ? (
+                      <>
+                        <Link
+                          href="/marketplace/create-listing"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Create Listing
+                        </Link>
+                        <Link
+                          href="/marketplace/my-listings"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          My Listings
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <Link
+                          href="/publish-ride"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Publish a Ride
+                        </Link>
+                        <Link
+                          href="/request-ride"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Request a Ride
+                        </Link>
+                      </>
+                    )}
+                  </div>
+
+                  <>
+                    {(() => {
+                      if (isMarketplace) {
+                        return (
+                          <Link
+                            href="/marketplace/profile"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
+                              <User2 className="h-4 w-4 text-black" />
+                              My Market Profile
+                            </button>
+                          </Link>
+                        );
+                      } else {
+                        return (
+                          <Link
+                            href="/my-profile"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
+                              <User2 className="h-4 w-4 text-black" />
+                              My Profile
+                            </button>
+                          </Link>
+                        );
+                      }
+                    })()}
+                  </>
                 </>
               ) : (
                 <>
                   <Link
                     href="/register"
                     className="text-gray-600 hover:text-gray-900 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
                   >
                     Register
                   </Link>
                   <Link
                     href="/login"
                     className="text-gray-600 hover:text-gray-900 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
                   >
                     Login
                   </Link>
