@@ -220,6 +220,14 @@ const MarketplaceProfile = () => {
       color: "bg-gray-100",
       iconColor: "text-gray-600",
     },
+    {
+      title: "Messages",
+      description: "View your marketplace conversations",
+      icon: MessageSquare,
+      href: "/marketplace/messages",
+      color: "bg-teal-100",
+      iconColor: "text-teal-600",
+    },
   ];
 
   return (

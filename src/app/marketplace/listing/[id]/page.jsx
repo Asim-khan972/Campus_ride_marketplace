@@ -243,6 +243,9 @@ export default function ListingDetailPage() {
           unreadCount: {
             [listing.sellerId]: 1,
           },
+          // Add these two fields:
+          chatType: "marketplace",
+          listingId: id,
         });
         chatId = chatRef.id;
       }
@@ -662,6 +665,9 @@ export default function ListingDetailPage() {
                           unreadCount: {
                             [listing.sellerId]: 1,
                           },
+                          // Add these two fields:
+                          chatType: "marketplace",
+                          listingId: id,
                         });
                         chatId = chatRef.id;
 

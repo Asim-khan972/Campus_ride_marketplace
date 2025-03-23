@@ -43,7 +43,8 @@ export default function Navbar() {
   const pathname = usePathname();
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadMarketplaceMessages, setUnreadMarketplaceMessages] = useState(0);
+  const [unreadRideMessages, setUnreadRideMessages] = useState(0);
 
   // Determine if we're in marketplace section
   const isMarketplace = pathname?.includes("/marketplace");
@@ -94,15 +95,24 @@ export default function Navbar() {
         );
         const chatsSnapshot = await getDocs(chatsQuery);
 
-        let totalUnread = 0;
+        let totalMarketplaceUnread = 0;
+        let totalRideUnread = 0;
 
         chatsSnapshot.forEach((chatDoc) => {
           const chatData = chatDoc.data();
-          // Add unread count for this user from the chat document
-          totalUnread += chatData.unreadCount?.[user.uid] || 0;
+          const unreadCount = chatData.unreadCount?.[user.uid] || 0;
+
+          // Separate counts by chat type
+          if (chatData.chatType === "marketplace") {
+            totalMarketplaceUnread += unreadCount;
+          } else {
+            // Either "ride" or undefined (for backward compatibility)
+            totalRideUnread += unreadCount;
+          }
         });
 
-        setUnreadMessages(totalUnread);
+        setUnreadMarketplaceMessages(totalMarketplaceUnread);
+        setUnreadRideMessages(totalRideUnread);
       } catch (error) {
         console.error("Error counting unread messages:", error);
       }
@@ -327,18 +337,34 @@ export default function Navbar() {
                   About
                 </Link>
 
-                {/* Messages with badge */}
-                <Link
-                  href="/owner/chats"
-                  className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
-                >
-                  <MessageSquare className="h-5 w-5 text-black" />
-                  {unreadMessages > 0 && (
-                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
-                      {unreadMessages > 99 ? "99+" : unreadMessages}
-                    </span>
-                  )}
-                </Link>
+                {/* Context-aware Messages with badge */}
+                {isMarketplace ? (
+                  <Link
+                    href="/marketplace/messages"
+                    className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    <MessageSquare className="h-5 w-5 text-black" />
+                    {unreadMarketplaceMessages > 0 && (
+                      <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
+                        {unreadMarketplaceMessages > 99
+                          ? "99+"
+                          : unreadMarketplaceMessages}
+                      </span>
+                    )}
+                  </Link>
+                ) : (
+                  <Link
+                    href="/rides/messages"
+                    className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    <MessageSquare className="h-5 w-5 text-black" />
+                    {unreadRideMessages > 0 && (
+                      <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
+                        {unreadRideMessages > 99 ? "99+" : unreadRideMessages}
+                      </span>
+                    )}
+                  </Link>
+                )}
 
                 {/* Notifications with badge */}
                 <button
@@ -363,6 +389,7 @@ export default function Navbar() {
                     <Plus className="h-4 w-4" />
                     {isMarketplace ? (
                       <>
+                        <ShoppingBag className="h-4 w-4" />
                         <span>Marketplace</span>
                       </>
                     ) : (
@@ -414,39 +441,33 @@ export default function Navbar() {
                           >
                             Request a Ride
                           </Link>
+                          <Link
+                            href="/my-rides"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-[#8163e9] hover:text-white transition-colors"
+                            onClick={() => setCreateDropdownOpen(false)}
+                          >
+                            My Rides
+                          </Link>
                         </>
                       )}
                     </div>
                   )}
                 </div>
 
-                <>
-                  {(() => {
-                    if (isMarketplace) {
-                      return (
-                        <Link
-                          href="/marketplace/profile"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          <button className="flex items-center gap-2  text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
-                            <User2 className="h-4 w-4 text-black" />
-                          </button>
-                        </Link>
-                      );
-                    } else {
-                      return (
-                        <Link
-                          href="/my-profile"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          <button className="flex items-center gap-2  text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
-                            <User2 className="h-4 w-4 text-black" />
-                          </button>
-                        </Link>
-                      );
-                    }
-                  })()}
-                </>
+                {/* Context-aware Profile Link */}
+                {isMarketplace ? (
+                  <Link href="/marketplace/profile">
+                    <button className="p-2 hover:bg-gray-100 rounded-md transition-colors">
+                      <User2 className="h-5 w-5 text-black" />
+                    </button>
+                  </Link>
+                ) : (
+                  <Link href="/my-profile">
+                    <button className="p-2 hover:bg-gray-100 rounded-md transition-colors">
+                      <User2 className="h-5 w-5 text-black" />
+                    </button>
+                  </Link>
+                )}
               </>
             ) : (
               <>
@@ -478,18 +499,34 @@ export default function Navbar() {
 
             {!authLoading && user && (
               <>
-                {/* Messages with badge (mobile) */}
-                <Link
-                  href="/chats"
-                  className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
-                >
-                  <MessageSquare className="h-5 w-5 text-black" />
-                  {unreadMessages > 0 && (
-                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
-                      {unreadMessages > 99 ? "99+" : unreadMessages}
-                    </span>
-                  )}
-                </Link>
+                {/* Context-aware Messages with badge (mobile) */}
+                {isMarketplace ? (
+                  <Link
+                    href="/marketplace/messages"
+                    className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    <MessageSquare className="h-5 w-5 text-black" />
+                    {unreadMarketplaceMessages > 0 && (
+                      <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
+                        {unreadMarketplaceMessages > 99
+                          ? "99+"
+                          : unreadMarketplaceMessages}
+                      </span>
+                    )}
+                  </Link>
+                ) : (
+                  <Link
+                    href="/rides/messages"
+                    className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    <MessageSquare className="h-5 w-5 text-black" />
+                    {unreadRideMessages > 0 && (
+                      <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[18px] h-[18px]">
+                        {unreadRideMessages > 99 ? "99+" : unreadRideMessages}
+                      </span>
+                    )}
+                  </Link>
+                )}
 
                 {/* Notifications with badge (mobile) */}
                 <button
@@ -594,6 +631,18 @@ export default function Navbar() {
                         >
                           My Listings
                         </Link>
+                        <Link
+                          href="/marketplace/messages"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Marketplace Messages
+                          {unreadMarketplaceMessages > 0 && (
+                            <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                              {unreadMarketplaceMessages}
+                            </span>
+                          )}
+                        </Link>
                       </>
                     ) : (
                       <>
@@ -611,39 +660,51 @@ export default function Navbar() {
                         >
                           Request a Ride
                         </Link>
+                        <Link
+                          href="/my-rides"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          My Rides
+                        </Link>
+                        <Link
+                          href="/rides/messages"
+                          className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Ride Messages
+                          {unreadRideMessages > 0 && (
+                            <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                              {unreadRideMessages}
+                            </span>
+                          )}
+                        </Link>
                       </>
                     )}
                   </div>
 
-                  <>
-                    {(() => {
-                      if (isMarketplace) {
-                        return (
-                          <Link
-                            href="/marketplace/profile"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
-                              <User2 className="h-4 w-4 text-black" />
-                              My Market Profile
-                            </button>
-                          </Link>
-                        );
-                      } else {
-                        return (
-                          <Link
-                            href="/my-profile"
-                            onClick={() => setIsMenuOpen(false)}
-                          >
-                            <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
-                              <User2 className="h-4 w-4 text-black" />
-                              My Profile
-                            </button>
-                          </Link>
-                        );
-                      }
-                    })()}
-                  </>
+                  {/* Context-aware Profile Link */}
+                  {isMarketplace ? (
+                    <Link
+                      href="/marketplace/profile"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
+                        <User2 className="h-4 w-4 text-black" />
+                        My Market Profile
+                      </button>
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/my-profile"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <button className="flex items-center gap-2 border text-black border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors w-full justify-center">
+                        <User2 className="h-4 w-4 text-black" />
+                        My Profile
+                      </button>
+                    </Link>
+                  )}
                 </>
               ) : (
                 <>

@@ -9,7 +9,7 @@ import {
   onSnapshot,
   doc,
   getDoc,
-  getDocs,
+  orderBy,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -20,21 +20,28 @@ import {
   ChevronRight,
   UserCircle,
   CheckCheck,
+  ChevronLeft,
+  Car,
 } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
-export default function OwnerChatInbox() {
+export default function RidesMessages() {
+  const router = useRouter();
   const { user } = useAuth();
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
 
     const chatsRef = collection(db, "chats");
+    // Query for chats where the current user is a participant AND the chat type is "ride" or not specified (for backward compatibility)
     const q = query(
       chatsRef,
-      where("participants", "array-contains", user.uid)
+      where("participants", "array-contains", user.uid),
+      orderBy("updatedAt", "desc")
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -45,10 +52,14 @@ export default function OwnerChatInbox() {
           ...doc.data(),
         }));
 
-        // Fetch user details and unread message counts for all chats
+        // Filter out marketplace chats
+        const ridesChats = fetchedChats.filter(
+          (chat) => chat.chatType !== "marketplace"
+        );
+
+        // Fetch user details for all participants
         const chatsWithUsers = await Promise.all(
-          fetchedChats.map(async (chat) => {
-            // Fetch user details for all participants
+          ridesChats.map(async (chat) => {
             const userDetails = await Promise.all(
               chat.participants.map(async (participantId) => {
                 const userDoc = await getDoc(doc(db, "users", participantId));
@@ -69,30 +80,22 @@ export default function OwnerChatInbox() {
             const otherUser =
               userDetails.find((u) => u.id !== user.uid) || null;
 
-            // Get unread count for current user from the chat document
-            let unreadCount = chat.unreadCount?.[user.uid] || 0;
+            // Get unread count for current user
+            const unreadCount = chat.unreadCount?.[user.uid] || 0;
 
-            // If we need to verify the unread count by actually counting unread messages:
-            if (chat.id) {
+            // Get ride details if available
+            let rideDetails = null;
+            if (chat.rideId) {
               try {
-                // Get all unread messages in this chat
-                const messagesRef = collection(
-                  db,
-                  "chats",
-                  chat.id,
-                  "messages"
-                );
-                const messagesQuery = query(
-                  messagesRef,
-                  where("senderId", "!=", user.uid),
-                  where("seen", "==", false)
-                );
-                const unreadSnapshot = await getDocs(messagesQuery);
-
-                // Use the actual count of unread messages
-                unreadCount = unreadSnapshot.size;
+                const rideDoc = await getDoc(doc(db, "rides", chat.rideId));
+                if (rideDoc.exists()) {
+                  rideDetails = {
+                    id: rideDoc.id,
+                    ...rideDoc.data(),
+                  };
+                }
               } catch (err) {
-                console.error("Error counting unread messages:", err);
+                console.error("Error fetching ride details:", err);
               }
             }
 
@@ -101,21 +104,16 @@ export default function OwnerChatInbox() {
               userDetails,
               otherUser,
               unreadCount,
+              rideDetails,
             };
           })
         );
-
-        // Sort chats by updatedAt timestamp (most recent first)
-        chatsWithUsers.sort((a, b) => {
-          if (!a.updatedAt) return 1;
-          if (!b.updatedAt) return -1;
-          return b.updatedAt.seconds - a.updatedAt.seconds;
-        });
 
         setChats(chatsWithUsers);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching user details:", error);
+        setError("Failed to load chat data");
         setLoading(false);
       }
     });
@@ -158,7 +156,9 @@ export default function OwnerChatInbox() {
           <h2 className="text-xl font-semibold mb-2 text-black">
             Authentication Required
           </h2>
-          <p className="text-black mb-4">Please log in to view your chats.</p>
+          <p className="text-black mb-4">
+            Please log in to view your ride messages.
+          </p>
           <Link
             href="/login"
             className="inline-block bg-[#8163e9] text-white px-6 py-2 rounded-lg hover:bg-[#8163e9]/90 transition-colors"
@@ -175,20 +175,29 @@ export default function OwnerChatInbox() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-[#8163e9] mx-auto mb-4" />
-          <p className="text-black">Loading your chats...</p>
+          <p className="text-black">Loading your ride messages...</p>
         </div>
       </div>
     );
   }
-
+  console.log("chats", chats);
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
+        {/* Back Button */}
+        <Link
+          href="/my-profile"
+          className="mb-6 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ChevronLeft className="h-5 w-5 mr-1" />
+          <span>Back to My Profile</span>
+        </Link>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-black">
-              Your Chats
+              Ride Messages
             </h1>
             <p className="text-gray-500 mt-1">
               {chats.length}{" "}
@@ -202,11 +211,11 @@ export default function OwnerChatInbox() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
             <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-black mb-2">
-              No Conversations Yet
+              No Ride Conversations Yet
             </h3>
             <p className="text-gray-500">
-              When you start chatting with other users, your conversations will
-              appear here.
+              When you message drivers or riders about rides, your conversations
+              will appear here.
             </p>
           </div>
         ) : (
@@ -230,7 +239,8 @@ export default function OwnerChatInbox() {
                               chat.otherUser.profilePicURL || "/placeholder.svg"
                             }
                             alt={chat.otherUser.fullName}
-                            fill
+                            width={48}
+                            height={48}
                             className="object-cover"
                           />
                         </div>
@@ -266,6 +276,17 @@ export default function OwnerChatInbox() {
                             : "No messages yet"}
                         </span>
                       </div>
+
+                      {/* Show ride info if available */}
+                      {chat.rideDetails && (
+                        <div className="flex items-center text-xs text-gray-500 mb-1">
+                          <Car className="h-3 w-3 mr-1" />
+                          <span className="truncate">
+                            {chat.rideDetails.origin} to{" "}
+                            {chat.rideDetails.destination}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-1 max-w-[80%]">
