@@ -190,6 +190,7 @@ const PublishRide = () => {
   };
 
   const fetchPickupSuggestions = async (input) => {
+    console.log("input", input);
     if (!input) return setPickupSuggestions([]);
     try {
       const response = await fetch(
@@ -200,6 +201,7 @@ const PublishRide = () => {
         formatted: feature.properties.formatted,
         city: feature.properties.city || "",
       }));
+      console.log("sugeesiton ", suggestions);
       setPickupSuggestions(suggestions);
       setShowPickupSuggestions(true);
     } catch (error) {
@@ -439,9 +441,11 @@ const PublishRide = () => {
                     type="text"
                     value={pickupLocation}
                     onChange={(e) => {
+                      setPickupLocation(e.target.value);
                       fetchPickupSuggestions(e.target.value);
                     }}
-                    className="w-full p-3 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
+                    className="w-full p-3 border text-black border-gray-300 rounded-lg
+                     focus:ring-2 focus:ring-[#8163e9] focus:border-transparent transition-colors"
                     required
                   />
                   {showPickupSuggestions && pickupSuggestions.length > 0 && (
