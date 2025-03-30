@@ -562,7 +562,7 @@ export default function ListingDetailPage() {
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder={`Hi, I'm interested in your "${listing.title}". Is this still available?`}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#8163e9] focus:border-[#8163e9] mb-4"
+                        className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-[#8163e9] focus:border-[#8163e9] mb-4"
                         rows={4}
                         required
                       ></textarea>

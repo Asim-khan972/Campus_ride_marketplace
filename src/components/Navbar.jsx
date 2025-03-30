@@ -354,7 +354,7 @@ export default function Navbar() {
                   </Link>
                 ) : (
                   <Link
-                    href="/rides/messages"
+                    href="/owner/chats"
                     className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
                   >
                     <MessageSquare className="h-5 w-5 text-black" />
@@ -516,7 +516,7 @@ export default function Navbar() {
                   </Link>
                 ) : (
                   <Link
-                    href="/rides/messages"
+                    href="/owner/chats"
                     className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
                   >
                     <MessageSquare className="h-5 w-5 text-black" />
@@ -668,7 +668,7 @@ export default function Navbar() {
                           My Rides
                         </Link>
                         <Link
-                          href="/rides/messages"
+                          href="/owner/chats"
                           className="block py-1.5 text-gray-700 hover:text-[#8163e9]"
                           onClick={() => setIsMenuOpen(false)}
                         >
